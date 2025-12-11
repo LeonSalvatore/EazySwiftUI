@@ -5,6 +5,7 @@
 //  Created by Leon Salvatore on 11.12.2025.
 //
 
+import SwiftUI
 
 /// A representation of a page size with standardized dimensions.
 ///
