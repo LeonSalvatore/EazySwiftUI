@@ -5,6 +5,7 @@
 //  Created by Leon Salvatore on 07.12.2025.
 //
 
+import SwiftUI
 
 public extension Array where Element: Identifiable & Hashable {
 
