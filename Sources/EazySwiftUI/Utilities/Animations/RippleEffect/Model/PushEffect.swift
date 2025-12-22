@@ -21,7 +21,7 @@ import SwiftUI
 /// ```
 ///
 /// - Parameter trigger: A value whose change triggers the animation.
-struct PushEffect<T: Equatable>: ViewModifier {
+struct PushEffect<T: Equatable>: ViewModifier where T: Sendable {
 
     /// A value that triggers the push animation when it changes.
     var trigger: T
@@ -35,8 +35,24 @@ struct PushEffect<T: Equatable>: ViewModifier {
                 view.scaleEffect(value)
             }
         } keyframes: { _ in
-            SpringKeyframe(0.95, duration: 0.2, spring: .snappy)
+            SpringKeyframe(0.85, duration: 0.2, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.2, spring: .bouncy)
         }
     }
+}
+
+#Preview {
+@Previewable @State var bar: Bool = false
+
+        Text("On Press Intercation")
+        Image(systemName: "person.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 100, height: 100)
+            .interactionEffect(.press(trigger: bar))
+            .onTapGesture {
+                bar.toggle()
+            }
+
+
 }

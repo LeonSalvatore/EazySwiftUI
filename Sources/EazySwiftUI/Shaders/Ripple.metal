@@ -10,7 +10,7 @@
 using namespace metal;
 
 [[ stitchable ]]
-half4 Ripple(
+half4 rippleEffect(
     float2 position,
     SwiftUI::Layer layer,
     float2 origin,
@@ -52,5 +52,3 @@ half4 Ripple(
 
     return color;
 }
-
-

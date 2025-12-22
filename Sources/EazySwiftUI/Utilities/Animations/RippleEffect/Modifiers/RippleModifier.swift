@@ -35,14 +35,25 @@ struct RippleModifier: ViewModifier {
     var speed: Double = 1200
 
     func body(content: Content) -> some View {
-        let shader = ShaderLibrary.Ripple(
-            .float2(origin),
-            .float(elapsedTime),
-            .float(amplitude),
-            .float(frequency),
-            .float(decay),
-            .float(speed)
+
+        let shader = EazyShaderLibrary
+            .ripple(
+            origin: origin,
+            time: Float(elapsedTime),
+            amplitude: Float(amplitude),
+            frequency: Float(frequency),
+            decay: Float(decay),
+            speed: Float(speed)
         )
+
+//        let shader = ShaderLibrary.Ripple(
+//            .float2(origin),
+//            .float(elapsedTime),
+//            .float(amplitude),
+//            .float(frequency),
+//            .float(decay),
+//            .float(speed)
+//        )
 
         let maxSampleOffset = maxSampleOffset
         let elapsedTime = elapsedTime
@@ -75,3 +86,4 @@ public extension View {
         modifier(SpatialPressingGestureModifier(action: action))
     }
 }
+
