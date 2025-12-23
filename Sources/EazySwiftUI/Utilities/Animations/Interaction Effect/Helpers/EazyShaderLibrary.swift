@@ -166,6 +166,48 @@ public enum EazyShaderLibrary {
         )
     }
 
+    /// Creates a shake distortion effect shader.
+        ///
+        /// - Parameters:
+        ///   - intensity: The strength of the shake effect (0.0-1.0).
+        ///   - frequency: How rapidly the shaking occurs.
+        ///   - time: Current animation time in seconds.
+        ///   - axis: The axis along which to shake (.horizontal, .vertical, or .both).
+        /// - Returns: A configured `Shader` instance for the shake effect.
+    static func shake(
+            intensity: Float = 0.1,
+            frequency: Float = 10.0,
+            time: Float = 0.0,
+            axis: InteractionAxis = .horizontal
+        ) -> Shader {
+            // Determine axis vector components
+            let axisX: Float
+            let axisY: Float
+
+            switch axis {
+            case .horizontal:
+                axisX = 1.0
+                axisY = 0.0
+            case .vertical:
+                axisX = 0.0
+                axisY = 1.0
+            case .both:
+                axisX = 1.0
+                axisY = 1.0
+            }
+
+            let library = ShaderLibrary.bundle(Bundle.module)
+            let function = ShaderFunction(library: library, name: "shakeEffect")
+
+            return Shader(function: function, arguments: [
+                .float(intensity),
+                .float(frequency),
+                .float(time),
+                .float(axisX),  // Pass as individual float
+                .float(axisY)   // Pass as individual float
+            ])
+        }
+
     // MARK: - Private Helper Methods
 
     /// Loads a precompiled shader from the package resources.

@@ -60,4 +60,49 @@ public extension View {
             self.modifier(BlurEffect(intensity: intensity))
         }
     }
+
+    /// Applies a shake effect using Metal shaders for high-performance animation.
+        ///
+        /// - Parameters:
+        ///   - trigger: A value that triggers the shake animation when it changes.
+        ///   - intensity: The strength of the shake (default: 10.0).
+        ///   - frequency: How rapidly the shaking occurs (default: 15.0).
+        ///   - duration: Total animation duration in seconds (default: 0.5).
+        ///   - axis: The axis along which to shake (default: .horizontal).
+        /// - Returns: A view with the shake effect applied.
+        @ViewBuilder
+        func shakeEffect<T: Equatable>(
+            _ trigger: T,
+            intensity: CGFloat = 10.0,
+            frequency: CGFloat = 15.0,
+            duration: TimeInterval = 0.5,
+            axis: InteractionAxis = .horizontal
+        ) -> some View where T: Sendable {
+
+            modifier(ShakeEffectViewModifier(
+                trigger: trigger,
+                intensity: intensity,
+                frequency: frequency,
+                duration: duration,
+                axis: axis
+            ))
+
+        }
+
+        /// Applies a spring-based shake effect (works on all iOS versions).
+        @ViewBuilder
+        func springShakeEffect<T: Equatable>(
+            _ trigger: T,
+            intensity: CGFloat = 10.0,
+            oscillations: Int = 3,
+            axis: InteractionAxis = .horizontal
+        ) -> some View  where T: Sendable {
+            modifier(SpringShakeEffectViewModifier(
+                trigger: trigger,
+                intensity: intensity,
+                oscillations: oscillations,
+                axis: axis
+            ))
+        } 
+
 }
