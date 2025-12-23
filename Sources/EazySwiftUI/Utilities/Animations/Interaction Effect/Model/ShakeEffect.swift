@@ -12,26 +12,16 @@ import SwiftUI
 struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
     
     let trigger: T
-    let intensity: CGFloat
-    let frequency: CGFloat
-    let duration: TimeInterval
-    let axis: InteractionAxis
+    let config: ShakeEffectConfig
 
     @State private var animationTime: Float = 0.0
     @State private var isAnimating = false
     
     init(
         trigger: T,
-        intensity: CGFloat = 10.0,
-        frequency: CGFloat = 15.0,
-        duration: TimeInterval = 0.5,
-        axis: InteractionAxis = .horizontal
-    ) {
+        config: ShakeEffectConfig = .secondary) {
         self.trigger = trigger
-        self.intensity = intensity
-        self.frequency = frequency
-        self.duration = duration
-        self.axis = axis
+        self.config = config
     }
     
     func body(content: Content) -> some View {
@@ -40,17 +30,18 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
                 content
                     .layerEffect(
                         EazyShaderLibrary.shake(
-                            intensity: Float(intensity / 100.0), // Convert to 0-1 range
-                            frequency: Float(frequency),
+                            intensity: Float(config.intensity / 100.0), // Convert to 0-1 range
+                            frequency: Float(config.frequency),
                             time: animationTime,
-                            axis: axis
+                            axis: config.axis
                         ),
                         maxSampleOffset: .init(
-                            width: intensity * 2,
-                            height: intensity * 2
+                            width: config.intensity * 2,
+                            height: config.intensity * 2
                         )
                     )
             }
+            .sensoryFeedback(config.sensoryFeedback ?? .warning, trigger: trigger)
             .onChange(of: trigger) { oldValue, newValue in
                 startShakeAnimation()
             }
@@ -73,8 +64,8 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
         animationTime = 0.0
         
         // Animate the time value
-        withAnimation(.easeOut(duration: duration)) {
-            animationTime = Float(duration)
+        withAnimation(.easeOut(duration: config.duration)) {
+            animationTime = Float(config.duration)
         } completion: {
             // Reset after animation completes
             withAnimation(.easeIn(duration: 0.1)) {
@@ -86,15 +77,43 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
     }
 }
 
+public struct ShakeEffectConfig: Sendable {
+
+    public var intensity: CGFloat
+    public var frequency: CGFloat
+    public var duration: TimeInterval
+    public var axis: InteractionAxis
+    public var sensoryFeedback: SensoryFeedback?
+
+    public init(
+        intensity: CGFloat = .zero,
+        frequency: CGFloat = .zero,
+        duration: TimeInterval = .zero,
+        axis: InteractionAxis = .horizontal,
+        sensoryFeedback: SensoryFeedback? = nil
+    ) {
+
+            self.intensity = intensity
+            self.frequency = frequency
+            self.duration = duration
+            self.axis = axis
+        }
+    public static var `default`: ShakeEffectConfig {
+        .init(intensity: 15.0, frequency: 20.0, duration: 0.6, axis: .horizontal)
+    }
+
+    public static var secondary: ShakeEffectConfig {
+        .init(intensity: 10.0, frequency: 15.0, duration: 0.5, axis: .horizontal)
+    }
+}
+
+
 // MARK: - Preview
 
 #Preview("Metal Shake Effect") {
     struct ShakePreview: View {
         @State private var shakeTrigger = 0
-        @State private var intensity: CGFloat = 15.0
-        @State private var frequency: CGFloat = 20.0
-        @State private var duration: TimeInterval = 0.6
-        @State private var selectedAxis: InteractionAxis = .horizontal
+        @State private var config: ShakeEffectConfig = .secondary
 
         var body: some View {
             VStack(spacing: 30) {
@@ -108,20 +127,14 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text("Intensity: \(intensity, specifier: "%.1f")")
+                    Text("Intensity: \(config.intensity, specifier: "%.1f")")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .frame(width: 200, height: 150)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .shakeEffect(
-                    shakeTrigger,
-                    intensity: intensity,
-                    frequency: frequency,
-                    duration: duration,
-                    axis: selectedAxis
-                )
+                .interactionEffect(.shake(shakeTrigger, config: .default))
                 .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
 
                 // Controls
@@ -132,7 +145,7 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
                     .buttonStyle(.borderedProminent)
 
                     // Axis picker
-                    Picker("Axis", selection: $selectedAxis) {
+                    Picker("Axis", selection: $config.axis) {
                         Text("Horizontal").tag(InteractionAxis.horizontal)
                         Text("Vertical").tag(InteractionAxis.vertical)
                         Text("Both").tag(InteractionAxis.both)
@@ -141,26 +154,26 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
 
                     // Intensity slider
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Intensity: \(intensity, specifier: "%.1f")")
+                        Text("Intensity: \(config.intensity, specifier: "%.1f")")
                             .font(.caption)
 
-                        Slider(value: $intensity, in: 1...30, step: 0.5)
+                        Slider(value: $config.intensity, in: 1...30, step: 0.5)
                     }
 
                     // Frequency slider
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Frequency: \(frequency, specifier: "%.1f")")
+                        Text("Frequency: \(config.frequency, specifier: "%.1f")")
                             .font(.caption)
 
-                        Slider(value: $frequency, in: 5...50, step: 1)
+                        Slider(value: $config.frequency, in: 5...50, step: 1)
                     }
 
                     // Duration slider
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Duration: \(duration, specifier: "%.2f")s")
+                        Text("Duration: \(config.duration, specifier: "%.2f")s")
                             .font(.caption)
 
-                        Slider(value: $duration, in: 0.1...2.0, step: 0.1)
+                        Slider(value: $config.duration, in: 0.1...2.0, step: 0.1)
                     }
                 }
                 .padding()
@@ -175,16 +188,16 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
                     HStack {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.red)
-                            .springShakeEffect(shakeTrigger, axis: .horizontal)
+                            .interactionEffect(.spring(shakeTrigger))
 
                         Text("Invalid input feedback")
                             .font(.caption)
                     }
 
                     HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "person.fill")
                             .foregroundColor(.orange)
-                            .shakeEffect(shakeTrigger, axis: .vertical)
+                            .interactionEffect(.shake(shakeTrigger, config: .init(axis: .vertical)))
 
                         Text("Warning notification")
                             .font(.caption)
@@ -193,7 +206,7 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
                     HStack {
                         Image(systemName: "hand.tap.fill")
                             .foregroundColor(.blue)
-                            .springShakeEffect(shakeTrigger, oscillations: 2)
+                            .interactionEffect(.spring(shakeTrigger, config: .init(oscillations:2)))
 
                         Text("Button press feedback")
                             .font(.caption)
@@ -216,28 +229,7 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
     return ShakePreview()
 }
 
-#Preview("Simple Spring Shake Effect") {
-
-    @Previewable @State var isActive = false
-
-     VStack(spacing: 20) {
-        Button("Shake Button") {
-            isActive.toggle()
-        }
-        .buttonStyle(.borderedProminent)
-        .springShakeEffect(isActive)
-
-        TextField("Shake on error", text: .constant(""))
-            .textFieldStyle(.roundedBorder)
-            .springShakeEffect(isActive, intensity: 5)
-
-        Toggle("Shake Toggle", isOn: $isActive)
-            .springShakeEffect(isActive, axis: .vertical)
-    }
-    .padding()
-}
-
-public enum InteractionAxis {
+public enum InteractionAxis: Sendable {
     case horizontal
     case vertical
     case both

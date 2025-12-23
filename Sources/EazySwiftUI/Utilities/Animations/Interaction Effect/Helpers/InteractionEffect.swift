@@ -29,6 +29,10 @@ public enum TriggeredEffect<T: Equatable> where T: Sendable {
     ///   - origin: The center point of the ripple in normalized coordinates (0-1).
     ///   - trigger: A value that triggers the animation when it changes.
     case ripple(origin: CGPoint, trigger: T)
+
+    case shake(_ trigger: T, config: ShakeEffectConfig = .default)
+
+    case spring(_ trigger: T, config: SpringEffectConfig = .default)
 }
 
 
@@ -48,4 +52,6 @@ public enum StaticEffect {
     /// A blur effect that softens the content.
     /// - Parameter intensity: The blur strength (0.0-10.0).
     case blur(intensity: CGFloat)
+
 }
+
