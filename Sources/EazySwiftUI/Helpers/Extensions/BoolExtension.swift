@@ -6,7 +6,7 @@
 //
 
 
-extension Bool {
+public extension Bool {
     
     /// Returns `true` if the boolean value is `false`, and `false` if the boolean value is `true`.
     ///

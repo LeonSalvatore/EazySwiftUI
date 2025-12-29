@@ -87,7 +87,8 @@ public extension Binding {
     ///   ```
     ///   In this example, editing the nickname will automatically create a new
     ///   `Profile` instance if `profile` is initially `nil`.
-        init<T>(
+    @MainActor
+    init<T: Sendable>(
             from optionalSource: Binding<T?>,
             keyPath: WritableKeyPath<T, Value?>,
             default defaultValue: Value,
