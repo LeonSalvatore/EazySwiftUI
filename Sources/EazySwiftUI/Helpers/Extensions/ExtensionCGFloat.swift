@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public struct CGDebug {
+ struct CGDebug {
 
     nonisolated(unsafe) static var isDebugEnabled = true
 
