@@ -92,3 +92,51 @@ public extension CGSize {
     /// Standard 4:3 aspect ratio (`width: 4, height: 3`).
     static var aspect4by3: Self { .init(width: 4, height: 3) }
 }
+
+
+// MARK: - Size Measurement Extension
+/// Extension for measuring view sizes efficiently
+public extension View {
+    /// Measures the size of a view and provides it via callback
+    /// Uses background GeometryReader to avoid affecting layout
+    /// - Parameter size: Callback that receives the measured size
+    /// - Returns: A view that measures its size
+    @ViewBuilder
+    func getSize(_ size: @escaping (CGSize) -> Void) -> some View {
+        self.background(
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(key: SizePreferenceKey.self, value: geometry.size)
+                    .onPreferenceChange(SizePreferenceKey.self) { size($0) }
+            }
+        )
+    }
+
+    @ViewBuilder
+    func getFrame(_ frame: @escaping (CGRect) -> Void) -> some View {
+        self.background(
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(key: FramePreferenceKey.self,
+                               value: geometry.frame(in: .global))
+                    .onPreferenceChange(FramePreferenceKey.self) { frame($0) }
+            }
+        )
+    }
+}
+
+// Separate preference keys for size and frame
+@MainActor
+struct SizePreferenceKey: @MainActor PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+struct FramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
