@@ -44,7 +44,27 @@ public extension Binding where Value: Hashable {
     }
 }
 
-public extension Binding {
+public extension Binding where Value: Hashable {
+
+    /// Creates a `Binding` to a reference type’s optional writable key path.
+    ///
+    /// Use this when you need a `Binding<Wrapped?>` but the underlying storage
+    /// lives in a reference type (`class`).
+    ///
+    /// - Parameters:
+    ///   - object: The reference-type instance whose property you want to bind.
+    ///   - keyPath: A `ReferenceWritableKeyPath` specifying the optional property
+    ///     on `object` to read and write.
+    @MainActor
+    init<T: AnyObject & Sendable, Wrapped>(
+        object: T,
+        keyPath: ReferenceWritableKeyPath<T, Wrapped?>
+    ) where Value == Wrapped? {
+        self.init(
+            get: { object[keyPath: keyPath] },
+            set: { object[keyPath: keyPath] = $0 }
+        )
+    }
 
     /// Creates a `Binding` to a nested optional value inside an optional model,
     /// providing a default value when the source or nested property is `nil`.
