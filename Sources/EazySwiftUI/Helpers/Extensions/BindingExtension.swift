@@ -36,10 +36,48 @@ public extension Binding where Value: Hashable {
     ///   ```
     ///
     /// This binding will now stay in sync with `settings.isEnabled`.
-    init<T: AnyObject & Sendable>(object: T, keyPath: ReferenceWritableKeyPath<T, Value>) {
+    @MainActor
+    init<T: AnyObject>(object: T, keyPath: ReferenceWritableKeyPath<T, Value>) {
         self.init(
             get: { object[keyPath: keyPath] },
             set: { object[keyPath: keyPath] = $0 }
+        )
+    }
+}
+
+public extension Binding {
+
+    /// Creates a non-optional binding from an optional binding by supplying a default value.
+    ///
+    /// Reading returns the wrapped value or the provided default. Writing stores the new
+    /// value back into the original optional binding.
+    ///
+    /// - Parameter defaultValue: The value to use when the optional binding is `nil`.
+    /// - Returns: A non-optional binding backed by the original optional binding.
+    @MainActor
+    func defaulting<Wrapped>(_ defaultValue: Wrapped) -> Binding<Wrapped> where Value == Wrapped? {
+        Binding<Wrapped>(
+            get: { wrappedValue ?? defaultValue },
+            set: { wrappedValue = $0 }
+        )
+    }
+
+    /// Maps this binding into a binding of another value type.
+    ///
+    /// Use this when a control edits a derived representation of your model value.
+    ///
+    /// - Parameters:
+    ///   - get: Converts the source value into the mapped value.
+    ///   - set: Converts the mapped value back into the source value.
+    /// - Returns: A binding to the mapped value.
+    @MainActor
+    func mapped<MappedValue>(
+        get: @escaping @MainActor (Value) -> MappedValue,
+        set: @escaping @MainActor (MappedValue) -> Value
+    ) -> Binding<MappedValue> {
+        Binding<MappedValue>(
+            get: { get(wrappedValue) },
+            set: { wrappedValue = set($0) }
         )
     }
 }
@@ -56,7 +94,7 @@ public extension Binding where Value: Hashable {
     ///   - keyPath: A `ReferenceWritableKeyPath` specifying the optional property
     ///     on `object` to read and write.
     @MainActor
-    init<T: AnyObject & Sendable, Wrapped>(
+    init<T: AnyObject, Wrapped>(
         object: T,
         keyPath: ReferenceWritableKeyPath<T, Wrapped?>
     ) where Value == Wrapped? {
@@ -134,4 +172,3 @@ public extension Binding where Value: Hashable {
         }
 
 }
-

@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+#if os(iOS)
 public extension UIImage {
     func reduceSize(_ heigth: CGFloat) -> UIImage {
         let scale = heigth / self.size.height
@@ -26,3 +27,4 @@ public extension UIImage {
         return resizedImage
     }
 }
+#endif

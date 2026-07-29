@@ -46,15 +46,6 @@ struct RippleModifier: ViewModifier {
             speed: Float(speed)
         )
 
-//        let shader = ShaderLibrary.Ripple(
-//            .float2(origin),
-//            .float(elapsedTime),
-//            .float(amplitude),
-//            .float(frequency),
-//            .float(decay),
-//            .float(speed)
-//        )
-
         let maxSampleOffset = maxSampleOffset
         let elapsedTime = elapsedTime
         let duration = duration
@@ -75,15 +66,46 @@ struct RippleModifier: ViewModifier {
 }
 
 public extension View {
-
+#if os(iOS) || os(macOS)
     /// Registers a spatial pressing gesture and reports the press location as it changes.
     ///
     /// The provided closure receives the current press location when the gesture begins
-    /// and `nil` when the gesture ends or is cancelled.
+    /// or changes, and `nil` when the gesture ends or is cancelled.
     ///
-    /// - Parameter action: A closure receiving the current press location or `nil`.
-    func onPressingChanged(_ action: @escaping (CGPoint?) -> Void) -> some View {
-        modifier(SpatialPressingGestureModifier(action: action))
+    /// - Parameters:
+    ///   - minimumDuration: The minimum time required before the press begins.
+    ///   - action: A closure receiving the current press location or `nil`.
+    func onPressingChanged(
+        minimumDuration: TimeInterval = 0,
+        _ action: @escaping (CGPoint?) -> Void
+    ) -> some View {
+        modifier(
+            SpatialPressingGestureModifier(
+                minimumDuration: minimumDuration,
+                action: action
+            )
+        )
     }
+
+    /// Registers a spatial pressing gesture and reports explicit gesture phases.
+    ///
+    /// Use this when the caller needs to distinguish between began, changed,
+    /// ended, and cancelled states.
+    ///
+    /// - Parameters:
+    ///   - minimumDuration: The minimum time required before the press begins.
+    ///   - action: A closure receiving the current pressing phase.
+    func onPressingPhaseChanged(
+        minimumDuration: TimeInterval = 0,
+        _ action: @escaping (PressingPhase) -> Void
+    ) -> some View {
+        modifier(
+            SpatialPressingPhaseModifier(
+                minimumDuration: minimumDuration,
+                action: action
+            )
+        )
+    }
+#endif
 }
 

@@ -5,6 +5,7 @@
 //  Created by Leon Salvatore on 11.12.2025.
 //
 
+#if os(iOS)
 import SwiftUI
 import PDFKit
 
@@ -196,3 +197,4 @@ public extension Bundle {
             ?? object(forInfoDictionaryKey: "CFBundleName") as? String
     }
 }
+#endif

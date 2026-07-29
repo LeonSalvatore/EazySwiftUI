@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+#if os(iOS)
 /// An extension on `Shape` that provides a convenience method for creating `CustomCornerShape`.
 public extension Shape where Self == CustomCornerShape {
     
@@ -42,3 +43,4 @@ public struct CustomCornerShape: Shape {
         return .init(path.cgPath)
     }
 }
+#endif

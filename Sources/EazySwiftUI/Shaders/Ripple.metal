@@ -1,9 +1,10 @@
 //
 //  Ripple.metal
-//  Taskly
+//  EazySwiftUI
 //
 //  Created by Leon Salvatore on 04/04/2025.
 //
+
 
 #include <metal_stdlib>
 #include <SwiftUI/SwiftUI.h>

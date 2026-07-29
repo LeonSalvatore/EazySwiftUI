@@ -19,7 +19,7 @@ import SwiftUI
 /// - **Precompiled Performance**: Shaders are compiled at build time, not runtime
 /// - **Type Safety**: Strongly-typed parameters and return values
 /// - **Resource Management**: Automatic resource loading and error handling
-/// - **Pplatform**: Works on iOS.
+/// - **Platform**: Works on iOS and macOS.
 ///
 ///
 /// ## Package Setup Requirements
@@ -30,7 +30,7 @@ import SwiftUI
 public enum EazyShaderLibrary {
 
     // Helper property
-    private static var bundleLibrary: ShaderLibrary {
+    public static var bundleLibrary: ShaderLibrary {
         ShaderLibrary.bundle(Bundle.module)
     }
 
@@ -94,7 +94,7 @@ public enum EazyShaderLibrary {
     ///     }
     /// }
     /// ```
-    static func ripple(
+    public static func ripple(
         origin: CGPoint,
         time: Float,
         amplitude: Float = 0.1,
@@ -125,7 +125,7 @@ public enum EazyShaderLibrary {
     /// - Parameter pixelSize: The size of each pixel in points.
     ///   Larger values create more pronounced pixelation.
     /// - Returns: A configured `Shader` instance.
-    static func pixellate(pixelSize: Float) -> Shader {
+    public static func pixellate(pixelSize: Float) -> Shader {
         loadShader(
             named: "Pixellate",
             functionName: "pixellateEffect",
@@ -139,7 +139,7 @@ public enum EazyShaderLibrary {
     ///   - keyColor: The color to make transparent (typically green).
     ///   - threshold: The color matching sensitivity (0.0 - 1.0).
     /// - Returns: A configured `Shader` instance.
-    static func chromaKey(keyColor: SIMD4<Float>, threshold: Float = 0.1) -> Shader {
+    public static func chromaKey(keyColor: SIMD4<Float>, threshold: Float = 0.1) -> Shader {
         loadShader(
             named: "ChromaKey",
             functionName: "chromaKeyEffect",
@@ -158,7 +158,7 @@ public enum EazyShaderLibrary {
     /// - Parameter intensity: The blur strength (0.0 - 10.0).
     ///   Higher values create more blur.
     /// - Returns: A configured `Shader` instance.
-    static func blur(intensity: Float) -> Shader {
+    public static func blur(intensity: Float) -> Shader {
         loadShader(
             named: "Blur",
             functionName: "gaussianBlur",
@@ -174,7 +174,7 @@ public enum EazyShaderLibrary {
         ///   - time: Current animation time in seconds.
         ///   - axis: The axis along which to shake (.horizontal, .vertical, or .both).
         /// - Returns: A configured `Shader` instance for the shake effect.
-    static func shake(
+    public static func shake(
             intensity: Float = 0.1,
             frequency: Float = 10.0,
             time: Float = 0.0,

@@ -62,7 +62,7 @@ struct RippleEffect<T: Equatable>: ViewModifier where T: Sendable {
 }
 
 
-
+#if os(iOS)
 #Preview("Ripple Effect") {
 
     @Previewable @State var counter: Int = 0
@@ -81,3 +81,4 @@ struct RippleEffect<T: Equatable>: ViewModifier where T: Sendable {
         .interactionEffect(.ripple(origin: origin, trigger: counter))
 
 }
+#endif

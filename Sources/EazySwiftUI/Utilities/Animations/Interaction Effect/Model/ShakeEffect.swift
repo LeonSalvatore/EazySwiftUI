@@ -25,6 +25,8 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
     }
     
     func body(content: Content) -> some View {
+        let animationTime = animationTime
+
         content
             .visualEffect { content, proxy in
                 content
@@ -109,7 +111,7 @@ public struct ShakeEffectConfig: Sendable {
 
 
 // MARK: - Preview
-
+#if os(iOS)
 #Preview("Metal Shake Effect") {
     struct ShakePreview: View {
         @State private var shakeTrigger = 0
@@ -228,7 +230,7 @@ public struct ShakeEffectConfig: Sendable {
 
     return ShakePreview()
 }
-
+#endif
 public enum InteractionAxis: Sendable {
     case horizontal
     case vertical
