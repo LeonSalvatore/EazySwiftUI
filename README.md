@@ -20,6 +20,7 @@ import EazySwiftUI
 - Reusable transitions and conditional view modifiers
 - Binding helpers for optional and derived values
 - Hex colors with light and dark appearance support
+- Image color extraction with gradient, palette, and legibility helpers
 - Wrapping flow layouts and async-state rendering
 - App-wide overlays and generic transient presentation coordination
 - Haptic feedback, persisted preferences, and localized text highlighting
@@ -48,7 +49,7 @@ import EazySwiftUI
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.2.0`.
+3. Select **Up to Next Major Version** starting from `0.3.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -59,7 +60,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.2.0"
+        from: "0.3.0"
     )
 ]
 ```
@@ -231,6 +232,87 @@ let surface = Color(
 
 Convert compatible colors back to hexadecimal values with `hex` or
 `hexString`.
+
+Pick a legible foreground for any background color, including colors that are
+only known at runtime:
+
+```swift
+Text(album.title)
+    .foregroundStyle(background.readableForeground)
+    .background(background)
+```
+
+`luminance` and `isDark` expose the same information when a view needs to make
+its own decision.
+
+### Image color extraction
+
+`EazyColorExtractor` reads representative colors out of an image so artwork can
+drive the surrounding UI. It downsamples the image once, then samples the
+resulting pixels, and returns sRGB colors.
+
+Banded colors keep the spatial order of the image, which is what a gradient
+needs:
+
+```swift
+let extractor = EazyColorExtractor(count: 3, axis: .vertical)
+let colors = extractor.colors(from: artwork)
+```
+
+Dominant colors are ranked by how much of the image they cover, with similar
+colors merged, which is what a palette or an accent color needs:
+
+```swift
+let palette = extractor.dominantColors(from: artwork)
+let accent = artwork.eazyDominantColor
+let average = artwork.eazyAverageColor
+```
+
+Every method also accepts a `CGImage`, and a `Data` overload decodes,
+downsamples, and samples off the calling actor:
+
+```swift
+let colors = await extractor.colors(from: downloadedImageData)
+```
+
+Configure sampling through the extractor:
+
+| Parameter | Purpose |
+| --- | --- |
+| `count` | Number of colors to produce |
+| `axis` | Direction the image is split along, `.vertical` or `.horizontal` |
+| `sampleSize` | Largest dimension, in pixels, of the downsampled image |
+| `minimumOpacity` | Opacity below which a pixel is ignored |
+
+`ImageGradient` turns the extracted colors into an animated backdrop, and
+reports the palette so the rest of the screen can reuse it:
+
+```swift
+ZStack {
+    ImageGradient(
+        image: album.artwork,
+        extractor: EazyColorExtractor(count: 4),
+        onExtract: { palette = $0 }
+    )
+    .ignoresSafeArea()
+
+    AlbumDetails(album: album)
+}
+```
+
+The same view is available as a background modifier:
+
+```swift
+AlbumDetails(album: album)
+    .eazyImageGradientBackground(album.artwork)
+```
+
+For a ready-made gradient without a dedicated view, build one directly:
+
+```swift
+Rectangle()
+    .fill(extractor.linearGradient(from: album.artwork))
+```
 
 ### Collections and values
 
@@ -437,7 +519,10 @@ platform-specific:
 
 - PDF generation and `UIImage` resizing/compression are available on iOS.
 - Selective corner rounding through `CustomCornerShape` is available on iOS.
-- `EazyPlatformColor` maps to `UIColor` on iOS and `NSColor` on macOS.
+- `EazyPlatformColor` maps to `UIColor` on iOS and `NSColor` on macOS, and
+  `EazyPlatformImage` maps to `UIImage` on iOS and `NSImage` on macOS.
+- Image color extraction, `ImageGradient`, and
+  `eazyImageGradientBackground(_:)` support both iOS and macOS.
 - Metal shader libraries are bundled as Swift Package resources; no manual
   resource setup is required when the package is installed through Swift
   Package Manager.

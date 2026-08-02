@@ -136,6 +136,39 @@ public extension Color {
         }
     }
 
+    /// The relative luminance of the color, from `0` for black to `1` for white.
+    ///
+    /// Uses the sRGB coefficients defined by WCAG, so the value reflects
+    /// perceived brightness rather than raw component averages. This pairs well
+    /// with colors produced by `EazyColorExtractor`, where the brightness of an
+    /// extracted palette is not known ahead of time.
+    var luminance: Double {
+        let components = rgbaComponents
+        return 0.2126 * Double(components.red)
+            + 0.7152 * Double(components.green)
+            + 0.0722 * Double(components.blue)
+    }
+
+    /// A Boolean value indicating whether the color reads as a dark color.
+    var isDark: Bool {
+        luminance < 0.5
+    }
+
+    /// A foreground color that stays legible on top of this color.
+    ///
+    /// Returns white on dark colors and black on light ones.
+    ///
+    /// ```swift
+    /// let background = artwork.eazyDominantColor ?? .accentColor
+    ///
+    /// Text(album.title)
+    ///     .foregroundStyle(background.readableForeground)
+    ///     .background(background)
+    /// ```
+    var readableForeground: Color {
+        isDark ? .white : .black
+    }
+
     private var rgbaComponents: EazyHexColorComponents {
         #if os(iOS)
         let color = UIColor(self).resolvedColor(with: .init())
