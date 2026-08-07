@@ -8,11 +8,24 @@ import SwiftUI
 /// Groups glass shapes so they can blend and morph into each other.
 ///
 /// Falls back to a plain passthrough on systems without Liquid Glass.
-struct EazyGlassContainer<Content: View>: View {
-    let spacing: CGFloat
-    @ViewBuilder let content: Content
+public struct EazyGlassContainer<Content: View>: View {
+    private let spacing: CGFloat
+    private let content: Content
 
-    var body: some View {
+    /// Creates a container whose glass surfaces can blend and morph together.
+    ///
+    /// - Parameters:
+    ///   - spacing: The spacing at which nearby glass surfaces begin to merge.
+    ///   - content: The glass surfaces to group.
+    public init(
+        spacing: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    public var body: some View {
         if #available(iOS 26.0, macOS 26.0, *) {
             GlassEffectContainer(spacing: spacing) {
                 content
@@ -23,7 +36,7 @@ struct EazyGlassContainer<Content: View>: View {
     }
 }
 
-extension View {
+public extension View {
     /// Applies a Liquid Glass background, falling back to a material capsule on
     /// systems that predate it.
     ///
