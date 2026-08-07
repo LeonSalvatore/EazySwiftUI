@@ -48,7 +48,7 @@ public struct EazyTabBarAction: Identifiable {
     public let title: LocalizedStringResource
     /// Whether the action is drawn in the destructive role.
     public let isDestructive: Bool
-    /// What the action does. The panel closes after it runs.
+    /// What the action does. The panel starts closing before it runs.
     public let handler: () -> Void
 
     public init(

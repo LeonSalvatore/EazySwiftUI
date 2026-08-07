@@ -16,6 +16,13 @@ All notable changes to EazySwiftUI are documented here.
   `.bouncy(duration: 0.75, extraBounce: 0.02)` for a softer, more deliberate
   expansion and collapse
 
+### Fixed
+
+- `EazyMorphingTabBar` collapse no longer stalls around the middle and snaps
+  shut at the end; both directions now traverse one reversible geometry path,
+  expanded content reacts immediately to closing, and actions initiate the
+  close before running their handlers
+
 ## 0.4.0
 
 ### Added

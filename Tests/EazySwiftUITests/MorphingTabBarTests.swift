@@ -425,11 +425,11 @@ struct MorphingTabBarMorphTests {
     func aSurfaceAtRestIsExactlyTheStripOrExactlyThePanel() {
         let layout = layout()
 
-        let collapsed = layout.surface(expandedBy: 0, expanding: true)
+        let collapsed = layout.surface(expandedBy: 0)
         #expect(collapsed.frame == layout.barRect)
         #expect(collapsed.cornerRadius == min(layout.barSize.width, layout.barSize.height) / 2)
 
-        let expanded = layout.surface(expandedBy: 1, expanding: true)
+        let expanded = layout.surface(expandedBy: 1)
         #expect(expanded.frame == layout.panelRect)
         #expect(expanded.cornerRadius == metrics.panelCornerRadius)
     }
@@ -443,9 +443,39 @@ struct MorphingTabBarMorphTests {
         // the edge it is growing towards leads and the rest catches up, which is
         // the lens's behaviour applied to a shape that changes size.
         let tallest = stride(from: 0.0, through: 1.0, by: 0.01)
-            .map { layout.surface(expandedBy: $0, expanding: true).frame.height }
+            .map { layout.surface(expandedBy: $0).frame.height }
             .max() ?? 0
         #expect(tallest > panel.height)
+    }
+
+    @Test
+    func collapseKeepsShrinkingAfterItsSmallInitialAnticipation() {
+        let layout = layout()
+        let heights = stride(from: 0.90, through: 0.0, by: -0.01)
+            .map { layout.surface(expandedBy: $0).frame.height }
+
+        for (earlier, later) in zip(heights, heights.dropFirst()) {
+            #expect(later <= earlier)
+        }
+
+        // The old direction-dependent stretch held the surface near 60% of the
+        // panel from progress 0.5 down to 0.2, and even grew it along the way.
+        let halfway = layout.surface(expandedBy: 0.5).frame.height
+        let late = layout.surface(expandedBy: 0.2).frame.height
+        #expect(late < halfway)
+    }
+
+    @Test
+    func closingContentRespondsImmediatelyAndReversesContinuously() {
+        let panelAtRest = EazyMorphingTabBarStretch.panelVisibility(at: 1)
+        let panelAfterCloseStarts = EazyMorphingTabBarStretch.panelVisibility(at: 0.95)
+
+        #expect(panelAtRest == 1)
+        #expect(panelAfterCloseStarts < panelAtRest)
+        #expect(EazyMorphingTabBarStretch.panelVisibility(at: 0.25) == 0)
+        #expect(EazyMorphingTabBarStretch.stripVisibility(at: 0.45) == 0)
+        #expect(EazyMorphingTabBarStretch.stripVisibility(at: 0.40) > 0)
+        #expect(EazyMorphingTabBarStretch.stripVisibility(at: 0) == 1)
     }
 
     @Test
@@ -454,7 +484,7 @@ struct MorphingTabBarMorphTests {
         // The strip and the panel share the bottom leading corner, so those two
         // edges must not move at any point in between.
         for step in stride(from: 0.0, through: 1.0, by: 0.05) {
-            let surface = layout.surface(expandedBy: step, expanding: true)
+            let surface = layout.surface(expandedBy: step)
             #expect(surface.frame.minX == 0)
             #expect(surface.frame.maxY == layout.canvasSize.height)
         }
@@ -471,7 +501,7 @@ struct MorphingTabBarMorphTests {
         // has crested, because the surface is still growing underneath it.
         let steps = stride(from: 0.0, through: 1.0, by: 0.01).map { step -> (Double, CGFloat) in
             let nominal = bar + (panel - bar) * CGFloat(step)
-            return (step, layout.surface(expandedBy: step, expanding: true).frame.height - nominal)
+            return (step, layout.surface(expandedBy: step).frame.height - nominal)
         }
         let peak = steps.max { $0.1 < $1.1 }?.0 ?? 0
 
@@ -493,7 +523,7 @@ struct MorphingTabBarMorphTests {
         .fitted(to: 360)
 
         for step in stride(from: 0.0, through: 1.0, by: 0.05) {
-            #expect(layout.surface(expandedBy: step, expanding: true).frame.height == metrics.barHeight)
+            #expect(layout.surface(expandedBy: step).frame.height == metrics.barHeight)
         }
     }
 

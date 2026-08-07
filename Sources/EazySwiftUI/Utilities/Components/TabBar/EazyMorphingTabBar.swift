@@ -154,22 +154,20 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
     /// arrangement uses: in landscape the system centres its bar at every count
     /// from two tabs to five.
     public var spreadsFrom: Int
-    /// How far the surface overshoots the shape it is growing into, as a
-    /// fraction of the distance the moving edge travels.
+    /// How far the surface leads its linear size while morphing, as a fraction
+    /// of the distance the moving edge travels.
     ///
     /// The panel is one of the few things here with nothing to measure against,
     /// because the system tab bar has no panel to expand into. The *law* is
-    /// measured, though: it is the lens's, so the surface leads with the edge it
-    /// is growing towards and lets the rest catch up, and it is exactly its own
-    /// size again at both ends. Only the size of the effect is a choice.
+    /// measured, though: it is the lens's, so the surface leads its underlying
+    /// size and is exactly its own size again at both ends. The same geometric
+    /// path is traversed in reverse while closing, which keeps an interrupted
+    /// or reversed morph continuous.
     ///
-    /// The crest sits four fifths of the way along, by which point the surface
-    /// has only a fifth of its journey left, so a fraction of the distance
-    /// travelled spends most of itself catching up with the growth rather than
-    /// leading it: at 0.45, the moving edge leads by 45 points in every hundred
-    /// it has to cover, and about a tenth of the change is left over as visible
-    /// overshoot past the shape it is settling into. Set it to zero for a
-    /// surface that resizes rather than stretches.
+    /// The crest sits four fifths of the way along. The default keeps this
+    /// geometric lead deliberately small and leaves the visible settling to the
+    /// caller's animation. Set it to zero for a surface that resizes without
+    /// stretching.
     public var morphStretch: Double
     /// Where in the morph the surface is at its most stretched.
     ///
@@ -203,7 +201,7 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         lensStretchPeak: Double = 0.83,
         screenInset: CGFloat = EazyMorphingTabBarMetrics.screenInset,
         spreadsFrom: Int = 4,
-        morphStretch: Double = 0.45,
+        morphStretch: Double = 0.12,
         morphStretchPeak: Double = 0.83
     ) {
         self.tabWidth = tabWidth
@@ -477,13 +475,12 @@ struct EazyMorphingTabBarLayout {
     /// spring's own overshoot — was cut off, and the shape arrived dead against
     /// a hard stop instead of settling back.
     ///
-    /// Two things can carry it past: the crest of the stretch, which sits at
-    /// ``EazyMorphingTabBarMetrics/morphStretchPeak`` of the way with
-    /// ``EazyMorphingTabBarMetrics/morphStretch`` of the distance added on top,
-    /// and the spring, which carries the progress a little past one on its own.
-    /// The larger of the two, less the journey itself, is the room needed.
+    /// Two things can carry it past: the geometric stretch and the spring,
+    /// which carries progress a little past one on its own. The stretch amount
+    /// is a safe upper bound for its excess; a quarter of the journey remains
+    /// the minimum so a caller-supplied spring has room to settle.
     var stretchHeadroom: CGSize {
-        let reach = max(metrics.morphStretchPeak + metrics.morphStretch, 1.25) - 1
+        let reach = max(metrics.morphStretch, 0.25)
         return CGSize(
             width: abs(panelSize.width - barSize.width) * CGFloat(reach),
             height: abs(panelSize.height - barSize.height) * CGFloat(reach)
@@ -504,13 +501,11 @@ struct EazyMorphingTabBarLayout {
     /// finishes at nothing, so a collapsed bar is exactly the strip and an
     /// expanded one exactly the panel.
     ///
-    /// The crest belongs to the journey rather than to the coordinate, which is
-    /// why the direction has to be passed in. A lens is longest four fifths of
-    /// the way to wherever it is going; so is this, whether that is the panel or
-    /// the strip. Reading the crest off the progress alone would put it four
-    /// fifths of the way *open* in both directions — a fifth of the way into a
-    /// collapse, which is far too early to be a lag.
-    func surface(expandedBy progress: Double, expanding: Bool) -> EazyLiquidGlassShape {
+    /// Opening and closing traverse the same path in opposite directions. The
+    /// previous direction-dependent path always added the stretch toward the
+    /// larger panel while closing; around the middle of a collapse that made the
+    /// surface stop shrinking, grow again, then snap shut near the end.
+    func surface(expandedBy progress: Double) -> EazyLiquidGlassShape {
         // The progress is deliberately not clamped where it is interpolated.
         // The morph is a spring, and a spring's overshoot past its destination
         // and back is the bounce; clamping it to one threw the bounce away and
@@ -518,7 +513,7 @@ struct EazyMorphingTabBarLayout {
         //
         // The stretch is clamped, because it is a single hump over a journey and
         // has to be nothing at both ends whatever the spring does around them.
-        let journey = min(max(expanding ? progress : 1 - progress, 0), 1)
+        let journey = min(max(progress, 0), 1)
         let stretch = CGFloat(
             EazyMorphingTabBarStretch.hump(journey, peak: metrics.morphStretchPeak)
                 * metrics.morphStretch
@@ -641,15 +636,33 @@ enum EazyMorphingTabBarStretch {
     /// What the bar's two sets of contents need is not a crossfade. Fading one
     /// out while the other fades in leaves both at half strength through the
     /// middle, and two rows of labels at half strength on top of each other read
-    /// as a smear rather than as one thing becoming another. So the strip is
-    /// given the opening of the morph to leave in, and the panel's contents the
-    /// rest to arrive in, and they never share the glass.
+    /// as a smear rather than as one thing becoming another. So the strip leaves
+    /// first and the panel follows, with only a short low-opacity overlap that
+    /// prevents an empty frame between them.
     ///
     /// Smoothstepped, so neither end of a fade is a corner.
     static func ramp(_ progress: Double, from start: Double, to end: Double) -> Double {
         guard end > start else { return progress >= end ? 1 : 0 }
         let travelled = min(max((progress - start) / (end - start), 0), 1)
         return travelled * travelled * (3 - 2 * travelled)
+    }
+
+    /// How visible the collapsed strip is along the reversible morph path.
+    ///
+    /// It leaves quickly while opening and starts returning before the final
+    /// third of closing. Its small overlap with the nearly transparent panel
+    /// avoids a frame where neither state visually belongs to the glass.
+    static func stripVisibility(at progress: Double) -> Double {
+        1 - ramp(progress, from: 0, to: 0.45)
+    }
+
+    /// How visible expanded content is along the reversible morph path.
+    ///
+    /// Ending at one rather than holding a fully opaque plateau makes the panel
+    /// react on the first interpolated frame of a close. Using one curve in both
+    /// directions also keeps rapid reversals continuous.
+    static func panelVisibility(at progress: Double) -> Double {
+        ramp(progress, from: 0.25, to: 1)
     }
 }
 
@@ -1156,9 +1169,6 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @preconcurrency Animatab
     /// How far the surface is through its morph. Arrives already interpolated,
     /// a frame at a time, from the modifier that owns that clock.
     @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
-    /// Which way the morph is heading, which is what places the stretch's crest.
-    @Environment(\.eazyMorphingTabBarIsExpanded) private var isExpanded
-
     var animatableData: Double {
         get { flight.position }
         set { flight.position = newValue }
@@ -1169,7 +1179,7 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @preconcurrency Animatab
         // overshoot, and its bottom edges are aligned; everything given in the
         // canvas's own space therefore sits that much further down in this one.
         let lift = layout.stretchHeadroom.height
-        var shape = layout.surface(expandedBy: morph, expanding: isExpanded)
+        var shape = layout.surface(expandedBy: morph)
         shape.frame.origin.y += lift
         var lens = self.lens(flight)
         lens.frame.origin.y += lift
@@ -1262,9 +1272,7 @@ private struct EazyMorphingTabBarStripFade: ViewModifier {
     @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
 
     func body(content: Content) -> some View {
-        // Gone by a third of the way, which is before there is enough panel for
-        // its contents to start arriving in.
-        let showing = 1 - EazyMorphingTabBarStretch.ramp(morph, from: 0, to: 0.35)
+        let showing = EazyMorphingTabBarStretch.stripVisibility(at: morph)
         return content
             .opacity(showing)
             .blur(radius: 6 * (1 - showing))
@@ -1289,11 +1297,10 @@ private struct EazyMorphingTabBarPanel<Content: View>: View {
     @ViewBuilder let content: Content
 
     @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
-    @Environment(\.eazyMorphingTabBarIsExpanded) private var isExpanded
 
     var body: some View {
         let progress = min(max(morph, 0), 1)
-        let surface = layout.surface(expandedBy: progress, expanding: isExpanded)
+        let surface = layout.surface(expandedBy: progress)
         // The panel shares the canvas's bottom leading corner, so the surface's
         // rectangle needs only shifting into the panel's own space.
         let clip = surface.frame.offsetBy(
@@ -1303,9 +1310,11 @@ private struct EazyMorphingTabBarPanel<Content: View>: View {
 
         content
             .frame(width: layout.panelSize.width, height: layout.panelSize.height)
-            // Nothing until the strip has gone, and fully there before the
-            // surface has finished settling.
-            .opacity(EazyMorphingTabBarStretch.ramp(progress, from: 0.35, to: 0.9))
+            // Starts after the strip is mostly gone and reaches full strength
+            // only when the surface reaches the panel.
+            .opacity(
+                EazyMorphingTabBarStretch.panelVisibility(at: progress)
+            )
             .mask(alignment: .topLeading) {
                 RoundedRectangle(
                     cornerRadius: min(
@@ -1757,8 +1766,8 @@ private struct EazyTabBarActionCell: View {
 
     var body: some View {
         Button {
-            action.handler()
             onPerform()
+            action.handler()
         } label: {
             VStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1799,7 +1808,7 @@ private struct EazyTabBarActionCell: View {
     /// How far in the tile is, from gone to arrived.
     private var entrance: Double {
         guard !reduceMotion else { return isExpanded ? 1 : 0 }
-        return EazyMorphingTabBarStretch.ramp(morph, from: 0.35, to: 0.9)
+        return EazyMorphingTabBarStretch.panelVisibility(at: morph)
     }
 }
 
