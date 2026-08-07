@@ -20,6 +20,7 @@ let package = Package(
             name: "EazySwiftUI",
             exclude: [
                 "Shaders/Blur.metal",
+                "Shaders/LiquidGlass.metal",
                 "Shaders/ChromaKey.metal",
                 "Shaders/Pixellate.metal",
                 "Shaders/Ripple.metal",

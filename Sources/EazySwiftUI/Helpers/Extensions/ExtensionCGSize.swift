@@ -10,11 +10,6 @@ import SwiftUI
 public extension CGSize {
     /// A set of predefined common `CGSize` values for various use cases.
 
-    // MARK: - Generic Sizes
-
-    /// Represents a zero-size CGSize (`width: 0, height: 0`).
-    static var zero: Self { .init(width: 0, height: 0) }
-
     // MARK: - Image Sizes
 
     /// Represents a standard Full HD image size (`width: 1920, height: 1080`).

@@ -15,6 +15,9 @@ import EazySwiftUI
 
 ## Highlights
 
+- A floating tab bar measured off the iOS 26 system bar, with a liquid glass
+  surface that morphs into a panel of actions
+- Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
 - SwiftUI interaction effects powered by Metal shaders
 - Animated shimmer loading states
 - Reusable transitions and conditional view modifiers
@@ -49,7 +52,7 @@ import EazySwiftUI
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.3.0`.
+3. Select **Up to Next Major Version** starting from `0.4.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -60,7 +63,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.3.0"
+        from: "0.4.0"
     )
 ]
 ```
@@ -120,6 +123,119 @@ Available effects:
 | --- | --- |
 | Triggered | `press`, `ripple`, `shake`, `spring` |
 | Static | `pixellate`, `chromaKey`, `blur` |
+
+### Morphing tab bar
+
+`EazyMorphingTabBar` is a floating tab bar that morphs into a panel of actions.
+Collapsed it is a strip of tabs and a round toggle beside it; the two are one
+body of glass that merges and separates as they move.
+
+```swift
+struct RootView: View {
+    @State private var selection = "house"
+    @State private var isExpanded = false
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            ContentView()
+
+            EazyMorphingTabBar(
+                tabs: [
+                    EazyTab(systemImage: "house", title: "Home"),
+                    EazyTab(systemImage: "tray", title: "Inbox"),
+                    EazyTab(systemImage: "bell", title: "Activity"),
+                    EazyTab(systemImage: "square.stack", title: "Library")
+                ],
+                selection: $selection,
+                isExpanded: $isExpanded,
+                actions: [
+                    EazyTabBarAction(systemImage: "scissors", title: "Trim") { trim() },
+                    EazyTabBarAction(systemImage: "crop", title: "Crop") { crop() }
+                ]
+            )
+            // The bar insets its own sides. Only the bottom edge is yours to
+            // place, and the system puts its bar 21 points above the screen
+            // edge rather than above the home indicator.
+            .padding(.bottom, EazyMorphingTabBarMetrics.screenInset)
+            .ignoresSafeArea(edges: .bottom)
+        }
+    }
+}
+```
+
+Pass `expandedContent:` instead of `actions:` to expand into a view of your own.
+With no actions the toggle is left off and the strip takes the full width, which
+is the arrangement that matches the system bar exactly.
+
+> Use one bar for the whole screen — an overlay on the `TabView`, or a
+> `safeAreaInset` — rather than one per page. A bar per page swaps for a
+> different instance part way through a transition, and the one that comes into
+> view is already parked on its new tab, which looks like a broken animation.
+
+The geometry is measured rather than estimated. `EazyMorphingTabBarMetrics`
+carries those measurements and every one of them is adjustable:
+
+| Preset | Use |
+| --- | --- |
+| `.standard` | The system bar: 62 points tall, title under the symbol |
+| `.shortScreen` | The bar the system draws where the screen is short: 44 points tall, title beside the symbol, always centred |
+| `.symbolsOnly` | The standard height with the titles suppressed |
+
+`.shortScreen` is taken automatically where the vertical size class is compact,
+which on an iPhone means landscape. Pass `shortScreenMetrics: nil` to keep one
+arrangement at every size, or your own metrics to change what the short screen
+gets.
+
+Selection can be dragged as well as tapped: the lens follows the finger rather
+than stepping from tab to tab. Reduce Motion drops the animation, and Reduce
+Transparency drops the glass for an opaque surface.
+
+Panel content that should arrive with the glass rather than on a schedule of its
+own can read how far the morph has gone:
+
+```swift
+struct PanelRow: View {
+    @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
+
+    var body: some View {
+        content.opacity(morph)
+    }
+}
+```
+
+### Liquid glass
+
+The tab bar's surface is available on its own. `eazyLiquidGlass(_:merging:)`
+draws a blurred, lit surface behind a view, with two shapes that merge into one
+body as they approach:
+
+```swift
+Color.clear
+    .frame(width: 300, height: 80)
+    .eazyLiquidGlass(
+        .capsule(CGRect(x: 0, y: 12, width: 220, height: 56)),
+        merging: .capsule(CGRect(x: 240, y: 12, width: 56, height: 56)),
+        style: .regular
+    )
+```
+
+A background cannot refract what is behind it, so bending content is a separate
+modifier that samples the view itself:
+
+```swift
+TabStrip()
+    .eazyLiquidLens(
+        .capsule(selectionFrame),
+        refraction: 10,
+        depth: 16,
+        dispersion: 0.12
+    )
+```
+
+Both are animatable, and both are drawn by a bundled Metal shader rather than by
+the system material, so they render the same from iOS 18 and macOS 15 onwards.
+Styles are configurable through `EazyLiquidGlassStyle`; `.regular`, `.tabBar`,
+and `.clear` are provided.
 
 ### Shimmer
 
@@ -525,7 +641,13 @@ platform-specific:
   `eazyImageGradientBackground(_:)` support both iOS and macOS.
 - Metal shader libraries are bundled as Swift Package resources; no manual
   resource setup is required when the package is installed through Swift
-  Package Manager.
+  Package Manager. Each shader ships three precompiled libraries — iOS device,
+  iOS simulator, and macOS — built against the package's own deployment targets,
+  and the matching one is selected at runtime. Nothing in a consuming project
+  needs a Metal build phase, and the `.metal` sources are excluded from the
+  target so they are never compiled twice.
+- Where a shader library cannot be loaded, the glass surfaces fall back to a
+  material-filled shape rather than disappearing.
 
 ## Development
 
