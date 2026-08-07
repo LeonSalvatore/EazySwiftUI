@@ -832,7 +832,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         collapseSymbol: String = "xmark",
         expandLabel: LocalizedStringResource = "More",
         collapseLabel: LocalizedStringResource = "Close",
-        morphAnimation: Animation = .bouncy,
+        morphAnimation: Animation = .bouncy(duration: 0.75, extraBounce: 0.02),
         selectionAnimation: Animation = .spring(duration: 0.4, bounce: 0.15),
         showsToggle: Bool = true,
         @ViewBuilder expandedContent: @escaping () -> Expanded
@@ -1090,7 +1090,7 @@ public extension EazyMorphingTabBar {
         collapseSymbol: String = "xmark",
         expandLabel: LocalizedStringResource = "More",
         collapseLabel: LocalizedStringResource = "Close",
-        morphAnimation: Animation = .bouncy,
+        morphAnimation: Animation = .bouncy(duration: 0.75, extraBounce: 0.02),
         selectionAnimation: Animation = .spring(duration: 0.4, bounce: 0.15)
     ) where Expanded == EazyTabBarActionGrid {
         self.init(

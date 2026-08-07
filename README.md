@@ -17,6 +17,8 @@ import EazySwiftUI
 
 - A floating tab bar measured off the iOS 26 system bar, with a liquid glass
   surface that morphs into a panel of actions
+- An expandable Liquid Glass menu that morphs between a compact label and
+  caller-provided content
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
 - SwiftUI interaction effects powered by Metal shaders
 - Animated shimmer loading states
@@ -202,6 +204,46 @@ struct PanelRow: View {
     }
 }
 ```
+
+### Expandable glass menu
+
+`ExpandableGlassMenu` morphs a compact label into any SwiftUI content. You own
+the progress, so the menu can be driven by a button, a gesture, or an interactive
+control.
+
+```swift
+struct MoreMenu: View {
+    @State private var isExpanded = false
+
+    var body: some View {
+        ExpandableGlassMenu(
+            alignment: .topLeading,
+            progress: isExpanded ? 1 : 0
+        ) {
+            VStack(alignment: .leading) {
+                Button("Send", systemImage: "paperplane") { }
+                Button("Swap", systemImage: "arrow.trianglehead.2.counterclockwise") { }
+                Button("Receive", systemImage: "arrow.down") { }
+            }
+            .padding()
+        } label: {
+            Button(
+                isExpanded ? "Close menu" : "Open menu",
+                systemImage: isExpanded ? "xmark" : "plus"
+            ) {
+                withAnimation(.bouncy(duration: 0.75, extraBounce: 0.02)) {
+                    isExpanded.toggle()
+                }
+            }
+            .labelStyle(.iconOnly)
+        }
+    }
+}
+```
+
+The default collapsed size is 55×55 points. Use `labelSize` and `cornerRadius`
+to fit a different control, and keep progress between `0` and `1` for manual or
+interactive updates.
 
 ### Liquid glass
 

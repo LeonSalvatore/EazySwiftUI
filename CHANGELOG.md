@@ -2,6 +2,20 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased
+
+### Added
+
+- public `ExpandableGlassMenu`, with configurable alignment, collapsed size,
+  corner radius, content and label, plus an interactive preview and README
+  example
+
+### Changed
+
+- `EazyMorphingTabBar` now defaults its panel morph to
+  `.bouncy(duration: 0.75, extraBounce: 0.02)` for a softer, more deliberate
+  expansion and collapse
+
 ## 0.4.0
 
 ### Added
