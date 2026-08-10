@@ -30,7 +30,11 @@ struct ShakeEffectViewModifier<T: Equatable>: ViewModifier where T: Sendable {
         content
             .visualEffect { content, proxy in
                 content
-                    .layerEffect(
+                    // `shakeEffect` maps a position to a position, which is a
+                    // distortion. Handing it to `layerEffect`, which wants a
+                    // sampler and a colour back, matches no signature the
+                    // shader has and draws nothing.
+                    .distortionEffect(
                         EazyShaderLibrary.shake(
                             intensity: Float(config.intensity / 100.0), // Convert to 0-1 range
                             frequency: Float(config.frequency),

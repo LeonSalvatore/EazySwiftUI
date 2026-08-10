@@ -796,6 +796,8 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     /// Held here rather than in the strip because the lens is cut out of the
     /// bar's glass, which is drawn at this level.
     @State private var flight = EazyMorphingTabBarLensFlight(resting: 0)
+    /// Which tab is currently under an active press.
+    @State private var pressedIndex: Int?
     /// The width of the widest tab laid out at its ideal size, for the short
     /// arrangement, where a tab is as wide as its title rather than a fixed box.
     @State private var widestTab: CGFloat = 0
@@ -1000,6 +1002,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
                 tabs: tabs,
                 selection: $selection,
                 flight: $flight,
+                pressedIndex: $pressedIndex,
                 tint: tint,
                 layout: layout,
                 selectionAnimation: reduceMotion ? nil : selectionAnimation
@@ -1064,6 +1067,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
                         layout: layout,
                         toggle: showsToggle ? .capsule(layout.toggleRect) : .none,
                         flight: flight,
+                        pressedIndex: pressedIndex,
                         lens: { lens(layout, $0) },
                         style: style
                     )
@@ -1155,12 +1159,14 @@ public extension EazyMorphingTabBar {
 /// it each frame is what lets the lens stretch on the way and arrive its own
 /// length again. `Animatable` is honoured on a `ViewModifier`, so the surface is
 /// applied to an empty view rather than being one.
-private struct EazyMorphingTabBarSurface: ViewModifier, @preconcurrency Animatable {
+private struct EazyMorphingTabBarSurface: ViewModifier, @MainActor Animatable {
     let layout: EazyMorphingTabBarLayout
     /// The toggle, in the canvas's space.
     let toggle: EazyLiquidGlassShape
     /// Where the lens is, and how far through a move. Animated.
     var flight: EazyMorphingTabBarLensFlight
+    /// Which tab is currently under an active press.
+    let pressedIndex: Int?
     /// The lens the flight puts on the glass, in the surface's own space.
     let lens: (EazyMorphingTabBarLensFlight) -> EazyLiquidGlassShape
     let style: EazyLiquidGlassStyle
@@ -1172,6 +1178,17 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @preconcurrency Animatab
     var animatableData: Double {
         get { flight.position }
         set { flight.position = newValue }
+    }
+
+    private let maxScaleEffect: CGFloat = 1.06
+
+    private var backgroundScale: CGFloat {
+        let travelProgress = flight.isTravelling ? flight.progress : 0
+        let triangularProgress = 1 - abs(travelProgress * 2 - 1)
+        let easedProgress = triangularProgress * triangularProgress * (3 - 2 * triangularProgress)
+        let travelScale = 1 + (maxScaleEffect - 1) * CGFloat(easedProgress)
+        let pressScale = pressedIndex == nil ? 1 : maxScaleEffect
+        return max(travelScale, pressScale)
     }
 
     func body(content: Content) -> some View {
@@ -1203,6 +1220,8 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @preconcurrency Animatab
                         .opacity(clearing)
                 }
             }
+        // only if there are no actions
+//            .scaleEffect(backgroundScale)
             .compositingGroup()
     }
 
@@ -1343,14 +1362,14 @@ private struct EazyMorphingTabBarStrip: View {
     @Binding var selection: EazyTab.ID
     /// Owned by the bar, because the lens is cut out of the bar's glass.
     @Binding var flight: EazyMorphingTabBarLensFlight
+    @Binding var pressedIndex: Int?
     let tint: Color
     let layout: EazyMorphingTabBarLayout
     let selectionAnimation: Animation?
 
-    private var metrics: EazyMorphingTabBarMetrics { layout.metrics }
+    @State private var dragPressedIndex: Int?
 
-    /// Which tab the finger is on, if any. Only that one reacts to the touch.
-    @State private var pressedIndex: Int?
+    private var metrics: EazyMorphingTabBarMetrics { layout.metrics }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -1359,13 +1378,18 @@ private struct EazyMorphingTabBarStrip: View {
                     tab: tab,
                     isSelected: tab.id == selection,
                     // Nil until a drag starts, so an ordinary tap still uses the
-                    // button's own press state.
-                    isPressed: pressedIndex.map { $0 == index },
+                    // button's own press and release state.
+                    isPressed: dragPressedIndex.map { $0 == index },
                     tint: tint,
                     metrics: metrics,
                     width: layout.tabStride,
-                    boxWidth: layout.tabWidth) {
-                    withAnimation(selectionAnimation) { selection = tab.id }
+                    boxWidth: layout.tabWidth,
+                    onPressChanged: { isPressed in
+                        withAnimation(selectionAnimation) {
+                            pressedIndex = isPressed ? index : nil
+                        }
+                    }) {
+                    withAnimation(selectionAnimation) { select(tab) }
                 }
             }
         }
@@ -1385,32 +1409,29 @@ private struct EazyMorphingTabBarStrip: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Dragging carries the lens under the finger instead of stepping it from
-    /// tab to tab, so the glass keeps travelling for as long as the finger does.
+    /// Dragging keeps the bar in its pressed state while the finger is down, then
+    /// commits the landing tab once on release.
     ///
     /// It takes priority over the tab buttons rather than running alongside them.
     /// Sharing the touch let every button the finger crossed light up, and let
     /// the button the drag started on fire its own action on release — which
     /// selected the tab the finger had just left. The minimum distance still
     /// leaves an ordinary tap to the button underneath.
-    ///
-    /// A dragged lens does not stretch. The stretch is what a lens does when it
-    /// is thrown at a tab and has to catch up with itself; under a finger it is
-    /// already exactly where it was put.
     private var drag: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                // Set outside the animation: the lens belongs to the finger
-                // while it is down, and animating it towards a moving target
-                // is what made it lag and double back.
                 flight = .init(resting: layout.lensPosition(draggedTo: value.location.x))
-                pressedIndex = layout.tabIndex(at: value.location.x)
-                // The lens is already under the finger; only the symbol and
-                // title need easing between their two states.
-                withAnimation(selectionAnimation) { select(at: value.location.x) }
+                let index = layout.tabIndex(at: value.location.x)
+                dragPressedIndex = index
+                if pressedIndex == nil {
+                    withAnimation(selectionAnimation) { pressedIndex = index }
+                } else {
+                    pressedIndex = index
+                }
             }
             .onEnded { value in
-                pressedIndex = nil
+                dragPressedIndex = nil
+                withAnimation(selectionAnimation) { pressedIndex = nil }
                 // Opening a journey is what lets the lens ease onto the tab —
                 // and stretch as it goes — instead of snapping there the moment
                 // the finger lifts.
@@ -1426,8 +1447,14 @@ private struct EazyMorphingTabBarStrip: View {
     }
 
     private func select(at x: CGFloat) {
-        guard let tab = tabs[safe: layout.tabIndex(at: x)], tab.id != selection else { return }
+        guard let tab = tabs[safe: layout.tabIndex(at: x)] else { return }
+        select(tab)
+    }
+
+    private func select(_ tab: EazyTab) {
+        guard tab.id != selection else { return }
         selection = tab.id
+        EazyHaptics.selection()
     }
 }
 
@@ -1477,6 +1504,7 @@ private struct EazyMorphingTabBarTab: View {
     let width: CGFloat
     /// The box the title may spread into, which is wider than the hit area.
     let boxWidth: CGFloat
+    let onPressChanged: (Bool) -> Void
     let action: () -> Void
 
 
@@ -1499,7 +1527,7 @@ private struct EazyMorphingTabBarTab: View {
             .contentShape(.capsule)
         }
         .compositingGroup()
-        .buttonStyle(EazyGlassPressStyle(isPressed: isPressed))
+        .buttonStyle(EazyGlassPressStyle(isPressed: isPressed, onPressChanged: onPressChanged))
         .accessibilityLabel(Text(tab.title))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
@@ -1631,6 +1659,7 @@ private struct EazyGlassPressStyle: ButtonStyle {
     /// drag, which knows which single tab the finger is actually on. Without it
     /// every button the finger crossed would react at once.
     var isPressed: Bool?
+    var onPressChanged: (Bool) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -1639,6 +1668,10 @@ private struct EazyGlassPressStyle: ButtonStyle {
         return configuration.label
             .scaleEffect(pressed && !reduceMotion ? scale : 1)
             .animation(.spring(response: 0.26, dampingFraction: 0.7), value: pressed)
+            .onChange(of: pressed) { _, isPressed in
+                guard self.isPressed == nil else { return }
+                onPressChanged(isPressed)
+            }
     }
 }
 
@@ -1665,6 +1698,7 @@ private struct EazyMorphingTabBarToggle: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: diameter, height: diameter)
                 .contentShape(.circle)
+
         }
         .buttonStyle(EazyGlassPressStyle(scale: 0.92))
         .accessibilityLabel(Text(isExpanded ? collapseLabel : expandLabel))

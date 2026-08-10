@@ -122,14 +122,14 @@ public struct EazyLiquidGlassStyle: Sendable {
     /// the two bars side by side over the same gradient, the system's glass
     /// carries the backdrop's colour through, while chrome material washes it
     /// out to near-white. So this is a thin material with the structure gradient
-    /// and the bevel pulled right back — the tint under the bar has to survive.
+    /// and the bevel pulled right back - the tint under the bar has to survive.
     ///
     /// The system's platter also carries no layer shadow of its own; the shadow
     /// here is only what is needed to stand a floating capsule off a bright
     /// background.
     /// The rim is lit almost head-on rather than from above. Measured against
-    /// the system bar, its edge is close to even — 21 levels of lift at the top
-    /// and 17 at the bottom — where a raking light gave this one a rim that
+    /// the system bar, its edge is close to even - 21 levels of lift at the top
+    /// and 17 at the bottom - where a raking light gave this one a rim that
     /// blew out to pure white on top and went dark underneath.
     public static let tabBar = EazyLiquidGlassStyle(
         material: .thinMaterial,
@@ -143,7 +143,7 @@ public struct EazyLiquidGlassStyle: Sendable {
         light: .init(x: 0.5, y: 0.12),
         lightElevation: 0.9,
         // No shadow, which is what `_UITabBarPlatterView` reports: its layer
-        // shadow opacity is zero. It also cannot be had cheaply — the glass is
+        // shadow opacity is zero. It also cannot be had cheaply - the glass is
         // translucent, so a shadow offset downwards shows *through* it and
         // shades everything below the top few points, which is what was tilting
         // this surface ten levels darker from top to bottom.
@@ -462,25 +462,14 @@ private struct EazyLiquidGlassFallbackSurface: View {
 
 /// Loads the precompiled liquid glass shaders and binds their arguments.
 enum EazyLiquidGlassShaders {
-    /// The precompiled library for the running platform, or `nil` when it is
-    /// missing, in which case callers draw the fallback surface.
-    static let library: ShaderLibrary? = {
-        #if targetEnvironment(simulator)
-        let variant = "sim"
-        #elseif os(macOS)
-        let variant = "macos"
-        #else
-        let variant = "device"
-        #endif
-
-        guard let url = Bundle.module.url(
-            forResource: "LiquidGlass-\(variant)",
-            withExtension: "metallib"
-        ) else {
-            return nil
-        }
-        return ShaderLibrary(url: url)
-    }()
+    /// The compiled library, or `nil` when this build produced none, in which
+    /// case callers draw the fallback surface.
+    ///
+    /// One library for the whole module, built for the destination being built
+    /// for. There is no platform variant to pick: choosing between
+    /// hand-compiled `-device`/`-sim`/`-macos` libraries was only ever needed
+    /// because the build system was not compiling the shaders at all.
+    static var library: ShaderLibrary? { EazyShaderLibrary.library }
 
     static func mask(
         primary: EazyLiquidGlassShape,

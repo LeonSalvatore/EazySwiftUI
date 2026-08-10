@@ -29,7 +29,13 @@ struct BlurEffect: ViewModifier {
                 content
                     .layerEffect(
                         EazyShaderLibrary.blur(intensity: Float(intensity)),
-                        maxSampleOffset: .zero
+                        // The kernel reaches one radius out in each direction,
+                        // and a sample past what is declared here comes back
+                        // clear: understating it eats the edges of the blur.
+                        maxSampleOffset: CGSize(
+                            width: intensity,
+                            height: intensity
+                        )
                     )
             }
     }

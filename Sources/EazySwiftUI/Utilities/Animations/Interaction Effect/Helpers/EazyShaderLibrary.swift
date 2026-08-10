@@ -9,29 +9,59 @@ import SwiftUI
 
 // MARK: - Shader Library Documentation
 
-/// A library of precompiled Metal shaders for SwiftUI effects.
+/// The module's Metal shaders, and the one place that resolves the library
+/// they live in.
 ///
-/// `EazyShaderLibrary` provides a collection of performant, precompiled Metal shaders
-/// that can be used with SwiftUI's `Shader` and `VisualEffect` APIs. All shaders
-/// are precompiled into `.metallib` files for optimal performance and binary size.
+/// Every `.metal` file under `Sources/EazySwiftUI/Shaders` is a source of this
+/// target, so the build system compiles the lot into a single
+/// `default.metallib` inside the generated resource bundle. Nothing is
+/// compiled by hand and nothing binary is committed: change a shader, build,
+/// and the library that ships is the one you just wrote.
 ///
-/// ## Key Features
-/// - **Precompiled Performance**: Shaders are compiled at build time, not runtime
-/// - **Type Safety**: Strongly-typed parameters and return values
-/// - **Resource Management**: Automatic resource loading and error handling
-/// - **Platform**: Works on iOS and macOS.
-///
-///
-/// ## Package Setup Requirements
-/// 1. Metal shader files must be in `Sources/[Target]/Shaders/` directory
-/// 2. Package.swift must declare resources: `.process("Shaders")`
-/// 3. Build Rules must compile .metal → .metallib (see Package.swift template)
-/// 4. Shader functions must be declared in Metal file with proper signatures
+/// ## Adding a shader
+/// 1. Put the `.metal` file in `Sources/EazySwiftUI/Shaders`. It needs no
+///    entry in `Package.swift` - the target picks it up as a source.
+/// 2. Mark the entry point `[[ stitchable ]]` and give it the signature the
+///    SwiftUI modifier you intend to use requires:
+///    - `.colorEffect` - `(float2 position, half4 color, …) -> half4`
+///    - `.layerEffect` - `(float2 position, SwiftUI::Layer layer, …) -> half4`
+///    - `.distortionEffect` - `(float2 position, …) -> float2`
+///    A shader handed to the wrong one of those does not draw. There is no
+///    compile-time check for it: the signature is matched at draw time.
+/// 3. Add a factory here that names the function and binds its arguments.
 public enum EazyShaderLibrary {
 
-    // Helper property
+    /// The compiled library, or `nil` when this build produced none.
+    ///
+    /// Only `swift build` produces none - SwiftPM's own build system has no
+    /// Metal rule and skips the `.metal` sources with an unhandled-file
+    /// warning. Callers that can draw something without a shader should check
+    /// this and fall back; the rest go through ``bundleLibrary``.
+    static let library: ShaderLibrary? = {
+        #if SWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE
+        // Asking the bundle for the file rather than trusting
+        // `ShaderLibrary.bundle` to report a miss: it has no failable form, so
+        // a missing library only surfaces at draw time, as nothing drawn.
+        guard Bundle.module.url(
+            forResource: "default",
+            withExtension: "metallib"
+        ) != nil else {
+            return nil
+        }
+        return ShaderLibrary.bundle(Bundle.module)
+        #else
+        return nil
+        #endif
+    }()
+
+    /// The compiled library, falling back to the app's own default library.
+    ///
+    /// The fallback is not expected to hold these functions. It is there so
+    /// the type stays non-optional for callers that have no second way to
+    /// draw, and so a missing library degrades to an effect that does nothing
+    /// rather than to a crash.
     public static var bundleLibrary: ShaderLibrary {
-        ShaderLibrary.bundle(Bundle.module)
+        library ?? .default
     }
 
     // MARK: - Ripple Effect
@@ -105,7 +135,6 @@ public enum EazyShaderLibrary {
 
         // Load the precompiled Metal library from the Swift Package resources
         loadShader(
-            named: "Ripple",
             functionName: "rippleEffect",
             arguments: [
                 .float2(origin),
@@ -127,7 +156,6 @@ public enum EazyShaderLibrary {
     /// - Returns: A configured `Shader` instance.
     public static func pixellate(pixelSize: Float) -> Shader {
         loadShader(
-            named: "Pixellate",
             functionName: "pixellateEffect",
             arguments: [.float(pixelSize)]
         )
@@ -141,7 +169,6 @@ public enum EazyShaderLibrary {
     /// - Returns: A configured `Shader` instance.
     public static func chromaKey(keyColor: SIMD4<Float>, threshold: Float = 0.1) -> Shader {
         loadShader(
-            named: "ChromaKey",
             functionName: "chromaKeyEffect",
             arguments: [
                 .color(Color(red: Double(keyColor.x),
@@ -160,7 +187,6 @@ public enum EazyShaderLibrary {
     /// - Returns: A configured `Shader` instance.
     public static func blur(intensity: Float) -> Shader {
         loadShader(
-            named: "Blur",
             functionName: "gaussianBlur",
             arguments: [.float(intensity)]
         )
@@ -196,40 +222,36 @@ public enum EazyShaderLibrary {
                 axisY = 1.0
             }
 
-            let library = ShaderLibrary.bundle(Bundle.module)
-            let function = ShaderFunction(library: library, name: "shakeEffect")
-
-            return Shader(function: function, arguments: [
-                .float(intensity),
-                .float(frequency),
-                .float(time),
-                .float(axisX),  // Pass as individual float
-                .float(axisY)   // Pass as individual float
-            ])
+            return loadShader(
+                functionName: "shakeEffect",
+                arguments: [
+                    .float(intensity),
+                    .float(frequency),
+                    .float(time),
+                    .float(axisX),  // Pass as individual float
+                    .float(axisY)   // Pass as individual float
+                ]
+            )
         }
 
     // MARK: - Private Helper Methods
 
-    /// Loads a precompiled shader from the package resources.
+    /// Binds a function from the compiled library.
+    ///
+    /// Every shader in the package lands in the same `default.metallib`, so
+    /// the function name is the whole address - there is no per-shader library
+    /// to pick first.
     ///
     /// - Parameters:
-    ///   - shaderName: The name of the .metallib file (without extension).
     ///   - functionName: The name of the Metal function within the library.
     ///   - arguments: The arguments to pass to the shader function.
-    /// - Returns: A configured `Shader` instance, or `nil` if loading fails.
-    ///
-    /// - Note: This method implements robust error handling and fallback mechanisms.
-    ///   It logs detailed errors in debug builds but fails gracefully in release builds.
-    // Even simpler approach using SwiftUI's built-in resource loading
+    /// - Returns: A configured `Shader` instance.
     private static func loadShader(
-        named shaderName: String,
         functionName: String,
         arguments: [Shader.Argument] = []
     ) -> Shader {
 
-        // Try to load from bundle first (simplest)
-        let library = bundleLibrary
-        let function = ShaderFunction(library: library, name: functionName)
+        let function = ShaderFunction(library: bundleLibrary, name: functionName)
         let shader = Shader(function: function, arguments: arguments)
 
         return shader

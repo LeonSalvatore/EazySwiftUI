@@ -244,8 +244,8 @@ struct MorphingTabBarNativeParityTests {
 
     @Test
     func theSymbolSitsAboveTheCentreToLeaveRoomForTheTitle() {
-        // _UITabButton sits at y = 4 in the bar, so its symbol boxes — at y = 10,
-        // 12, 10 and 8.67 with heights 28, 23.67, 27.67 and 32.33 — centre on
+        // _UITabButton sits at y = 4 in the bar, so its symbol boxes - at y = 10,
+        // 12, 10 and 8.67 with heights 28, 23.67, 27.67 and 32.33 - centre on
         // 20, 19.83, 19.83 and 20.83 within the box. Title box 35..47.
         #expect(metrics.symbolCenterY == 20)
         #expect(metrics.symbolCenterY < metrics.tabHeight / 2)
@@ -369,15 +369,15 @@ struct MorphingTabBarShortScreenTests {
         #expect(EazyMorphingTabBarMetrics.standard.tabStride < EazyMorphingTabBarMetrics.standard.tabWidth)
     }
 
-    /// The system centres its short bar at every count from two tabs to five —
+    /// The system centres its short bar at every count from two tabs to five -
     /// 176.67, 268.33, 357 and 454.33 points in an 874-point window, all of them
-    /// well inside it — where the tall bar spreads from four.
+    /// well inside it - where the tall bar spreads from four.
     @Test(arguments: [2, 3, 4, 5])
     func theShortBarNeverSpreads(count: Int) {
         let natural = layout(tabs: count).naturalWidth
 
         for available in [402.0, 874.0, 1366.0] as [CGFloat] {
-            // Its natural width wherever it fits, and never wider — a screen
+            // Its natural width wherever it fits, and never wider - a screen
             // with room to spare must not pull the tabs apart. Somewhere too
             // narrow for it is the one case where it gives ground.
             #expect(layout(tabs: count).fitted(to: available).barSize.width == min(natural, available))
@@ -580,7 +580,7 @@ struct MorphingTabBarLensFlightTests {
     func theStretchMatchesTheSystemsAtItsPeak() {
         let layout = layout()
         // Filmed against a flat backdrop, the system's lens grows 23 points on a
-        // three-tab move — 0.09 of the 254 points it covers.
+        // three-tab move - 0.09 of the 254 points it covers.
         let peak = layout.lens(
             .init(position: 3 * metrics.lensStretchPeak, origin: 0, destination: 3)
         )

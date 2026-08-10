@@ -45,7 +45,7 @@ All notable changes to EazySwiftUI are documented here.
   points from the screen edges, 94×54 tab boxes on an 86-point stride, and a
   selection lens that is the tab box itself
 - a short-screen arrangement, taken automatically where the vertical size class
-  is compact — an iPhone in landscape. The system does not shrink its bar there,
+  is compact - an iPhone in landscape. The system does not shrink its bar there,
   it lays out a different one, and so does this: 44 points instead of 62, the
   title beside the symbol instead of under it and two points larger while the
   symbol gives up six, tab boxes four points apart instead of overlapping by

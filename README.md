@@ -171,8 +171,8 @@ Pass `expandedContent:` instead of `actions:` to expand into a view of your own.
 With no actions the toggle is left off and the strip takes the full width, which
 is the arrangement that matches the system bar exactly.
 
-> Use one bar for the whole screen — an overlay on the `TabView`, or a
-> `safeAreaInset` — rather than one per page. A bar per page swaps for a
+> Use one bar for the whole screen - an overlay on the `TabView`, or a
+> `safeAreaInset` - rather than one per page. A bar per page swaps for a
 > different instance part way through a transition, and the one that comes into
 > view is already parked on its new tab, which looks like a broken animation.
 
@@ -727,8 +727,8 @@ platform-specific:
   `eazyImageGradientBackground(_:)` support both iOS and macOS.
 - Metal shader libraries are bundled as Swift Package resources; no manual
   resource setup is required when the package is installed through Swift
-  Package Manager. Each shader ships three precompiled libraries — iOS device,
-  iOS simulator, and macOS — built against the package's own deployment targets,
+  Package Manager. Each shader ships three precompiled libraries - iOS device,
+  iOS simulator, and macOS - built against the package's own deployment targets,
   and the matching one is selected at runtime. Nothing in a consuming project
   needs a Metal build phase, and the `.metal` sources are excluded from the
   target so they are never compiled twice.

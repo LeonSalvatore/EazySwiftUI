@@ -574,7 +574,7 @@ installation.
 
 ## Suggested delivery sequence
 
-### Release 0.2.0 — reliability and small extractions
+### Release 0.2.0 - reliability and small extractions
 
 1. make iOS and macOS builds green
 2. replace the placeholder tests
@@ -584,7 +584,7 @@ installation.
 6. add `PersistedPreference`
 7. add localized text highlighting
 
-### Release 0.3.0 — presentation infrastructure
+### Release 0.3.0 - presentation infrastructure
 
 1. add `EazyOverlayHost`
 2. add the generic transient presentation center
@@ -592,7 +592,7 @@ installation.
 4. add the configurable blocking-overlay modifier
 5. migrate Campzone first, then EcclesiaKit
 
-### Release 0.4.0 — async UI state
+### Release 0.4.0 - async UI state
 
 1. add `AsyncPhase`
 2. add `AsyncPhaseView`
