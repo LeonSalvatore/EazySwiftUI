@@ -17,6 +17,8 @@ import EazySwiftUI
 
 - A floating tab bar measured off the iOS 26 system bar, with a liquid glass
   surface that morphs into a panel of actions
+- A scrollable segment control with a Liquid Glass capsule that morphs to the
+  active tab, with optional icons, badges, and full appearance configuration
 - An expandable Liquid Glass menu that morphs between a compact label and
   caller-provided content
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
@@ -54,7 +56,7 @@ import EazySwiftUI
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.5.0`.
+3. Select **Up to Next Major Version** starting from `0.6.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -65,7 +67,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.5.0"
+        from: "0.6.0"
     )
 ]
 ```
@@ -204,6 +206,48 @@ struct PanelRow: View {
     }
 }
 ```
+
+### Glass segment control
+
+`EazyGlassSegmentControl` is a horizontally scrollable strip of tabs. A glass
+capsule tracks the active tab, morphing its width to match the current label.
+The strip scrolls to keep the active tab centered whenever `selection` changes.
+
+```swift
+struct FilterBar: View {
+    @State private var selection = 0
+    @State private var tabs: [EazyGlassSegmentControl.Tab] = [
+        .init(title: "All"),
+        .init(title: "Music", icon: "music.note"),
+        .init(title: "Videos", icon: "play.rectangle"),
+        .init(title: "Podcasts", icon: "mic"),
+        .init(title: "Books", icon: "books.vertical"),
+    ]
+
+    var body: some View {
+        EazyGlassSegmentControl(selection: $selection, tabs: $tabs)
+    }
+}
+```
+
+Pass a `Configuration` to adjust appearance:
+
+```swift
+EazyGlassSegmentControl(
+    configuration: .init(
+        tint: .purple,
+        font: .subheadline,
+        height: 44,
+        showIcons: false
+    ),
+    selection: $selection,
+    tabs: $tabs
+)
+```
+
+Each `Tab` accepts an optional SF Symbol `icon` and an optional `badge` string.
+The control uses its own layout measurements so multiple instances can safely
+share the same `tabs` binding with different configurations.
 
 ### Expandable glass menu
 

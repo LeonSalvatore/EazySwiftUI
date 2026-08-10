@@ -2,6 +2,18 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## 0.6.0
+
+### Added
+
+- `EazyGlassSegmentControl`, a horizontally scrollable segment control with a
+  Liquid Glass selection capsule that morphs its width to match the active tab.
+  Tapping a tab or setting `selection` programmatically scrolls the strip to
+  keep the active item centered. Each `Tab` supports an optional SF Symbol icon
+  and an optional badge string. Appearance is configurable through
+  `EazyGlassSegmentControl.Configuration`: `tint`, `font`, `height`,
+  `labelPadding`, `showIcons`, and `hapticsEnabled`
+
 ## 0.5.0
 
 ### Added
