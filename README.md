@@ -725,13 +725,11 @@ platform-specific:
   `EazyPlatformImage` maps to `UIImage` on iOS and `NSImage` on macOS.
 - Image color extraction, `ImageGradient`, and
   `eazyImageGradientBackground(_:)` support both iOS and macOS.
-- Metal shader libraries are bundled as Swift Package resources; no manual
-  resource setup is required when the package is installed through Swift
-  Package Manager. Each shader ships three precompiled libraries - iOS device,
-  iOS simulator, and macOS - built against the package's own deployment targets,
-  and the matching one is selected at runtime. Nothing in a consuming project
-  needs a Metal build phase, and the `.metal` sources are excluded from the
-  target so they are never compiled twice.
+- The `.metal` sources are sources of the package target, so Xcode compiles
+  them along with everything else and links them into one `default.metallib`
+  inside the package's own resource bundle, built for whatever destination is
+  being built for. Nothing in a consuming project needs a Metal build phase and
+  no shader binaries are committed.
 - Where a shader library cannot be loaded, the glass surfaces fall back to a
   material-filled shape rather than disappearing.
 
@@ -745,8 +743,15 @@ cd EazySwiftUI
 swift test
 ```
 
-When changing Metal shaders, use the included `compile_shaders.sh` script to
-rebuild the packaged `.metallib` resources for supported destinations.
+Metal shaders need no separate step. Drop a `.metal` file into
+`Sources/EazySwiftUI/Shaders` and build: Xcode compiles it into the package's
+`default.metallib`, which is where `EazyShaderLibrary` looks for it.
+
+`swift test` is the one build that does not compile them, because SwiftPM's own
+build system has no Metal rule — it reports the `.metal` files as unhandled and
+skips them. Everything still compiles and the tests still run; the shaders
+simply resolve to nothing, which no test exercises. To see a shader run, build
+for a simulator or a device.
 
 ## Roadmap
 

@@ -2,6 +2,23 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## 0.6.1
+
+### Added
+
+- A test that loads the compiled shader library through Metal and checks it
+  holds every function the package names. Nothing else ties a shader name to
+  the Swift that calls it — a name that stops resolving just draws nothing —
+  so this is what would catch the shaders falling out of the build again. It
+  runs on a simulator or a device, and skips under `swift test`, which
+  compiles no shaders
+
+### Changed
+
+- Documentation for the shader pipeline. The README described the removed
+  per-platform `.metallib` resources, and `EazyShaderLibrary` still told
+  callers to reach for a `.shader()` modifier, which is not a thing
+
 ## 0.6.0
 
 ### Added
@@ -13,6 +30,33 @@ All notable changes to EazySwiftUI are documented here.
   and an optional badge string. Appearance is configurable through
   `EazyGlassSegmentControl.Configuration`: `tint`, `font`, `height`,
   `labelPadding`, `showIcons`, and `hapticsEnabled`
+
+### Fixed
+
+- Metal shaders are compiled by the build system again. The `.metal` files had
+  been excluded from the target and hand-compiled `.metallib` files shipped as
+  resources in their place, which left the resource bundle with no
+  `default.metallib`. Every effect resolved through
+  `ShaderLibrary.bundle(.module)` — ripple, blur, pixellate, chroma key, and
+  shake — therefore addressed a library that was not there and silently drew
+  nothing. The `.metal` files are now target sources, so each build links one
+  `default.metallib` for the destination it is building for
+- `shakeEffect` is applied with `distortionEffect` rather than `layerEffect`.
+  It maps a position to a position, which is not a signature `layerEffect`
+  accepts, so the shake never drew
+- `chromaKeyEffect` takes its key colour as a `half4`. A
+  `Shader.Argument.color` is bound as four components, so declaring three left
+  the shader reading the wrong bytes for both the colour and the threshold
+  after it
+- The blur effect declares a `maxSampleOffset` that covers its kernel. At
+  `.zero` every sample the kernel took outside the pixel came back clear, which
+  ate the edges of the blur
+
+### Removed
+
+- `compile_shaders.sh` and the 19 committed `.metallib` binaries. Shaders are
+  built from source on every build; there is nothing left to regenerate by hand
+  and nothing to go stale against the `.metal` files
 
 ## 0.5.0
 

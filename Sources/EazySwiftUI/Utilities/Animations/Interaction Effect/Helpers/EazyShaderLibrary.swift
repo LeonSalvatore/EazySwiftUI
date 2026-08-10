@@ -31,23 +31,29 @@ import SwiftUI
 /// 3. Add a factory here that names the function and binds its arguments.
 public enum EazyShaderLibrary {
 
-    /// The compiled library, or `nil` when this build produced none.
+    /// The compiled library on disk, or `nil` when this build produced none.
     ///
     /// Only `swift build` produces none - SwiftPM's own build system has no
     /// Metal rule and skips the `.metal` sources with an unhandled-file
-    /// warning. Callers that can draw something without a shader should check
-    /// this and fall back; the rest go through ``bundleLibrary``.
+    /// warning.
+    static let libraryURL: URL? = {
+        #if SWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE
+        Bundle.module.url(forResource: "default", withExtension: "metallib")
+        #else
+        nil
+        #endif
+    }()
+
+    /// The compiled library, or `nil` when this build produced none.
+    ///
+    /// Callers that can draw something without a shader should check this and
+    /// fall back; the rest go through ``bundleLibrary``.
     static let library: ShaderLibrary? = {
         #if SWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE
-        // Asking the bundle for the file rather than trusting
+        // Going through ``libraryURL`` rather than trusting
         // `ShaderLibrary.bundle` to report a miss: it has no failable form, so
         // a missing library only surfaces at draw time, as nothing drawn.
-        guard Bundle.module.url(
-            forResource: "default",
-            withExtension: "metallib"
-        ) != nil else {
-            return nil
-        }
+        guard libraryURL != nil else { return nil }
         return ShaderLibrary.bundle(Bundle.module)
         #else
         return nil
@@ -86,7 +92,7 @@ public enum EazyShaderLibrary {
     ///   - speed: The propagation speed of the ripple waves.
     ///     Higher values make ripples move faster.
     ///
-    /// - Returns: A configured `Shader` instance ready for use with SwiftUI's `.shader()` modifier.
+    /// - Returns: A configured `Shader` instance, for `layerEffect`.
     ///
     /// - Important: All coordinates are in normalized space (0-1). Convert view coordinates
     ///   using `GeometryReader` or `VisualEffect` proxy.
@@ -106,7 +112,7 @@ public enum EazyShaderLibrary {
     ///         Rectangle()
     ///             .fill(.blue.gradient)
     ///             .frame(width: 300, height: 300)
-    ///             .shader(
+    ///             .layerEffect(
     ///                 EazyShaderLibrary.ripple(
     ///                     origin: rippleOrigin,
     ///                     time: time,
@@ -114,7 +120,8 @@ public enum EazyShaderLibrary {
     ///                     frequency: 8.0,
     ///                     decay: 0.85,
     ///                     speed: 1.5
-    ///                 )
+    ///                 ),
+    ///                 maxSampleOffset: CGSize(width: 12, height: 12)
     ///             )
     ///             .onAppear {
     ///                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
