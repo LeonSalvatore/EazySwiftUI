@@ -23,6 +23,7 @@ import EazySwiftUI
   caller-provided content
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
 - SwiftUI interaction effects powered by Metal shaders
+- An animated, Reduce Motion-aware gradient beam for rounded borders
 - Animated shimmer loading states
 - Reusable transitions and conditional view modifiers
 - Binding helpers for optional and derived values
@@ -56,7 +57,7 @@ import EazySwiftUI
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.6.0`.
+3. Select **Up to Next Major Version** starting from `0.7.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -67,7 +68,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.6.0"
+        from: "0.7.0"
     )
 ]
 ```
@@ -190,9 +191,19 @@ which on an iPhone means landscape. Pass `shortScreenMetrics: nil` to keep one
 arrangement at every size, or your own metrics to change what the short screen
 gets.
 
+Tab widths adapt to their labels in both arrangements. Ordinary portrait labels
+retain the native fixed geometry; when one title exceeds that box, it receives
+width from its shorter neighbors instead of being truncated in an equal column.
+Landscape tabs always keep their individual measured widths. When the detached
+action toggle constrains the strip, long labels are prioritized while
+`minimumHitWidth` preserves 44-point touch targets wherever the available width
+permits; `longTitlePadding` controls the breathing room around an oversized
+portrait title.
+
 Selection can be dragged as well as tapped: the lens follows the finger rather
-than stepping from tab to tab. Reduce Motion drops the animation, and Reduce
-Transparency drops the glass for an opaque surface.
+than stepping from tab to tab, and release commits directly from the finger's
+position without returning through the previous selection. Reduce Motion drops
+the animation, and Reduce Transparency drops the glass for an opaque surface.
 
 Panel content that should arrive with the glass rather than on a schedule of its
 own can read how far the morph has gone:
@@ -340,6 +351,32 @@ RoundedRectangle(cornerRadius: 12)
 ```
 
 Set `isActive` to `false` to show the original content without the effect.
+
+### Border beam
+
+Use `borderBeamEffect` to draw a rotating gradient beam around a rounded view.
+The effect is decorative, does not intercept touches, and remains visible
+without rotating when Reduce Motion is enabled.
+
+```swift
+Button("Secure my spot", systemImage: "arrow.right") {
+    register()
+}
+.buttonStyle(.borderedProminent)
+.frame(height: 50)
+.borderBeamEffect(
+    border: .accentColor,
+    showsBaseBorder: true,
+    beam: [.pink, .purple, .cyan],
+    beamBlur: 14,
+    cornerRadius: 12,
+    duration: 2.5,
+    isEnabled: canRegister
+)
+```
+
+Apply `BorderBeamEffectModifier` directly when you need to compose it with
+another modifier. Empty `beam` colors fall back to the `border` color.
 
 ### View layout and conditional modifiers
 

@@ -2,6 +2,32 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## 0.7.0
+
+### Added
+
+- Public `BorderBeamEffectModifier` and `borderBeamEffect` view modifier,
+  extracted from Campzone with configurable colors, blur, corner radius,
+  rotation duration, base-border visibility, and enabled state. The decorative
+  effect does not intercept input and stops rotating when Reduce Motion is
+  enabled
+
+### Fixed
+
+- `EazyMorphingTabBar` now keeps each landscape tab at its own measured width
+  instead of making every tab as wide as the longest title, and portrait bars
+  give an unusually long title width from their shorter neighbors instead of
+  truncating it inside an equal box. Selection lenses, nonoverlapping hit
+  regions, and drag boundaries follow the resolved widths while retaining
+  44-point targets where the available width permits. The native comparison
+  preview exercises a long label and a single detached `Tab(role: .search)`
+  alongside the custom action toggle
+- Dragging `EazyMorphingTabBar` now commits selection from the finger's release
+  position without briefly returning the lens to the previously selected tab
+- `EazyGlassSegmentControl` now falls back to material below macOS 26 and no
+  longer applies the iOS-only `limitsScrolls` property when compiling for
+  macOS, restoring the package's declared macOS 15 build support
+
 ## 0.6.1
 
 ### Added

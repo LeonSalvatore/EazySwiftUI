@@ -77,9 +77,19 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
     /// where the tab is sized to its content rather than to a fixed width.
     ///
     /// Sixteen points: the system leaves six before the symbol and ten after
-    /// the title. They are added together rather than kept apart because these
-    /// tabs are laid out at one width — see ``EazyMorphingTabBarLayout``.
+    /// the title. They are stored together because the compact layout measures
+    /// each complete symbol-and-title row as one tab box.
     public var tabPadding: CGFloat
+    /// The combined breathing room around a title that outgrows the standard
+    /// portrait tab box.
+    ///
+    /// Short titles keep ``tabWidth`` exactly. A longer title instead receives
+    /// its measured width plus this inset, matching the native bar's behavior of
+    /// widening that destination and yielding space from its shorter neighbors.
+    public var longTitlePadding: CGFloat
+    /// The smallest horizontal touch target the layout tries to preserve while
+    /// compressing differently-sized tabs.
+    public var minimumHitWidth: CGFloat
     /// The gap between the strip and the toggle.
     public var spacing: CGFloat
     /// The point size of the toggle symbol.
@@ -187,6 +197,8 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         labelHeight: CGFloat = 12,
         titleSpacing: CGFloat = 8,
         tabPadding: CGFloat = 16,
+        longTitlePadding: CGFloat = 40,
+        minimumHitWidth: CGFloat = 44,
         spacing: CGFloat = 10,
         toggleSymbolSize: CGFloat = 20,
         panelPadding: CGFloat = 6,
@@ -216,6 +228,8 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         self.labelHeight = labelHeight
         self.titleSpacing = titleSpacing
         self.tabPadding = tabPadding
+        self.longTitlePadding = max(longTitlePadding, 0)
+        self.minimumHitWidth = max(minimumHitWidth, 1)
         self.spacing = spacing
         self.toggleSymbolSize = toggleSymbolSize
         self.panelPadding = panelPadding
@@ -292,10 +306,10 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
     /// whole point, and the two derivations are half a point apart, so a whole
     /// point is as fine as the measurement warrants.
     public static let shortScreen = EazyMorphingTabBarMetrics(
-        // A placeholder pair, replaced by the width of the widest tab once the
-        // bar has measured its own titles; the gap between them is what matters
-        // and is held to the measured four points. The system's own tabs run
-        // from 81 to 93 points wide over the titles measured.
+        // A placeholder pair, replaced by each tab's own width once the bar has
+        // measured its titles; the gap between them is what matters and is held
+        // to the measured four points. The system's own tabs run from 81 to 93
+        // points wide over the original titles measured.
         tabWidth: 84,
         tabStride: 88,
         barHeight: 44,
@@ -318,6 +332,9 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
 struct EazyMorphingTabBarLayout {
     let metrics: EazyMorphingTabBarMetrics
     let tabCount: Int
+    /// Ideal widths measured from the compact, side-by-side tab contents.
+    /// Nil keeps the standard system geometry, where every tab has one width.
+    let tabWidths: [CGFloat]?
     let expandedContentSize: CGSize
     /// The width the strip has to fill. Nil takes the natural width, which is
     /// what the strip measures when nothing constrains it.
@@ -328,12 +345,14 @@ struct EazyMorphingTabBarLayout {
     init(
         metrics: EazyMorphingTabBarMetrics,
         tabCount: Int,
+        tabWidths: [CGFloat]? = nil,
         expandedContentSize: CGSize,
         barWidth: CGFloat? = nil,
         hasToggle: Bool = true
     ) {
         self.metrics = metrics
         self.tabCount = tabCount
+        self.tabWidths = tabWidths
         self.expandedContentSize = expandedContentSize
         self.barWidth = barWidth
         self.hasToggle = hasToggle
@@ -352,6 +371,7 @@ struct EazyMorphingTabBarLayout {
         let natural = EazyMorphingTabBarLayout(
             metrics: metrics,
             tabCount: tabCount,
+            tabWidths: tabWidths,
             expandedContentSize: expandedContentSize,
             barWidth: nil,
             hasToggle: hasToggle
@@ -364,6 +384,7 @@ struct EazyMorphingTabBarLayout {
         return EazyMorphingTabBarLayout(
             metrics: metrics,
             tabCount: tabCount,
+            tabWidths: tabWidths,
             expandedContentSize: expandedContentSize,
             barWidth: max(resolved, metrics.barHeight),
             hasToggle: hasToggle
@@ -371,6 +392,30 @@ struct EazyMorphingTabBarLayout {
     }
 
     private var tabs: CGFloat { CGFloat(max(tabCount, 1)) }
+
+    /// Compact system tabs size themselves to their own symbol and title. The
+    /// standard arrangement has fixed boxes, represented by the fallback.
+    private var naturalTabWidths: [CGFloat] {
+        guard
+            let tabWidths,
+            tabWidths.count == tabCount,
+            tabWidths.allSatisfy({ $0 > 0 })
+        else {
+            return Array(repeating: metrics.tabWidth, count: max(tabCount, 1))
+        }
+        return tabWidths
+    }
+
+    var usesVariableTabWidths: Bool {
+        guard let tabWidths else { return false }
+        return tabCount > 0
+            && tabWidths.count == tabCount
+            && tabWidths.allSatisfy { $0 > 0 }
+    }
+
+    /// The empty space between neighbouring compact boxes. It is negative in
+    /// the standard arrangement, where the fixed boxes overlap.
+    var tabGap: CGFloat { metrics.tabStride - metrics.tabWidth }
 
     /// How far a tab box hangs over its neighbour's.
     ///
@@ -385,7 +430,9 @@ struct EazyMorphingTabBarLayout {
     /// one box wide plus a stride for every tab after the first — not one box
     /// per tab. This is what makes four tabs measure 360 points rather than 384.
     var naturalWidth: CGFloat {
-        metrics.barPadding * 2 + metrics.tabWidth + (tabs - 1) * metrics.tabStride
+        metrics.barPadding * 2
+            + naturalTabWidths.reduce(0, +)
+            + (tabs - 1) * tabGap
     }
 
     var barSize: CGSize {
@@ -405,11 +452,106 @@ struct EazyMorphingTabBarLayout {
     /// The width of one tab box, and so of the selection capsule.
     var tabWidth: CGFloat { tabStride + tabOverlap }
 
+    /// A content-sized tab's resolved box width.
+    ///
+    /// Compression first preserves a 44-point hit target, then preserves the
+    /// part of any unusually long title that exceeds the normal tab width, and
+    /// only then shares the remaining room between the ordinary tabs. This is
+    /// what keeps one long portrait title readable beside the detached toggle
+    /// instead of truncating it while much shorter labels retain excess space.
+    func tabWidth(at index: Int) -> CGFloat {
+        guard usesVariableTabWidths else { return tabWidth }
+        let clamped = min(max(index, 0), max(tabCount - 1, 0))
+        return resolvedVariableTabWidths[clamped]
+    }
+
+    private var resolvedVariableTabWidths: [CGFloat] {
+        let ideal = naturalTabWidths
+        let gaps = CGFloat(max(tabCount - 1, 0)) * tabGap
+        let target = max(contentWidth - gaps, 0)
+        let idealTotal = ideal.reduce(0, +)
+        guard idealTotal > 0, tabCount > 0 else { return ideal }
+
+        if target >= idealTotal {
+            let extra = (target - idealTotal) / CGFloat(tabCount)
+            return ideal.map { $0 + extra }
+        }
+
+        // A box's hit cell also owns the fixed gap beside it. For overlapping
+        // portrait boxes the cell is eight points narrower; for compact boxes
+        // it is four points wider.
+        let minimumBox = max(metrics.minimumHitWidth - tabGap, 1)
+        let minimumTotal = minimumBox * CGFloat(tabCount)
+        guard target >= minimumTotal else {
+            return Array(repeating: target / CGFloat(tabCount), count: tabCount)
+        }
+
+        var widths = Array(repeating: minimumBox, count: tabCount)
+        var remaining = target - minimumTotal
+
+        // A label wider than the ordinary system box gets first claim on the
+        // constrained space. This is the behavior visible in the native bar:
+        // short destinations narrow while the long destination stays legible.
+        let longTitleNeeds = ideal.map { max($0 - metrics.tabWidth, 0) }
+        let longTitleTotal = longTitleNeeds.reduce(0, +)
+        if longTitleTotal > 0, remaining > 0 {
+            let scale = min(remaining / longTitleTotal, 1)
+            for index in widths.indices {
+                widths[index] += longTitleNeeds[index] * scale
+            }
+            remaining -= longTitleTotal * scale
+        }
+
+        let ordinaryNeeds = zip(ideal, widths).map { max($0.0 - $0.1, 0) }
+        let ordinaryTotal = ordinaryNeeds.reduce(0, +)
+        if ordinaryTotal > 0, remaining > 0 {
+            let scale = min(remaining / ordinaryTotal, 1)
+            for index in widths.indices {
+                widths[index] += ordinaryNeeds[index] * scale
+            }
+            remaining -= ordinaryTotal * scale
+        }
+
+        if remaining > 0 {
+            let extra = remaining / CGFloat(tabCount)
+            for index in widths.indices {
+                widths[index] += extra
+            }
+        }
+        return widths
+    }
+
+    /// The lens width at a fractional position, interpolated between the two
+    /// differently-sized compact tabs it is travelling between.
+    func tabWidth(at position: Double) -> CGFloat {
+        guard tabCount > 0 else { return 0 }
+        let clamped = min(max(position, 0), Double(tabCount - 1))
+        let lower = Int(clamped.rounded(.down))
+        let upper = min(lower + 1, tabCount - 1)
+        let progress = CGFloat(clamped - Double(lower))
+        let start = tabWidth(at: lower)
+        return start + (tabWidth(at: upper) - start) * progress
+    }
+
+    /// Width assigned to a button in the strip.
+    ///
+    /// The cell owns the fixed gap as well as its box. With an eight-point
+    /// overlap this makes the hit cell eight points narrower than the lens; with
+    /// a four-point compact gap it makes the cell four points wider. Either way,
+    /// cells meet without overlapping and their centers remain the lens centers.
+    func tabHitWidth(at index: Int) -> CGFloat {
+        max(tabWidth(at: index) + tabGap, 1)
+    }
+
+    var stripSpacing: CGFloat { 0 }
+
     /// The inset from the bar edge to the first tab's hit area.
     ///
-    /// Tab boxes overlap, so their hit areas are one stride wide and centred in
-    /// the box; the leftover half-overlap pads the strip.
-    var stripPadding: CGFloat { metrics.barPadding + tabOverlap / 2 }
+    /// Offsets the first hit cell by half the fixed box gap, leaving its visual
+    /// box exactly ``barPadding`` points from the surface edge.
+    var stripPadding: CGFloat {
+        metrics.barPadding - tabGap / 2
+    }
 
     var panelSize: CGSize {
         CGSize(
@@ -546,8 +688,10 @@ struct EazyMorphingTabBarLayout {
     /// Boxes overlap, so a point can fall inside two of them; the nearer centre
     /// wins, which puts the boundary exactly halfway between two tabs.
     func tabIndex(at x: CGFloat) -> Int {
-        let offset = (x - lensCenter(at: 0)) / tabStride
-        return min(max(Int(offset.rounded()), 0), max(tabCount - 1, 0))
+        guard tabCount > 0 else { return 0 }
+        return (0..<tabCount).min {
+            abs(lensCenter(at: $0) - x) < abs(lensCenter(at: $1) - x)
+        } ?? 0
     }
 
     /// The centre of the lens when it rests on a tab.
@@ -558,10 +702,26 @@ struct EazyMorphingTabBarLayout {
     /// The centre of the lens at a fractional position between tabs, which is
     /// where it sits for all but the two instants at either end of a move.
     func lensCenter(at position: Double) -> CGFloat {
+        guard tabCount > 0 else { return metrics.barPadding }
         let clamped = min(max(position, 0), Double(max(tabCount - 1, 0)))
+        let lower = Int(clamped.rounded(.down))
+        let upper = min(lower + 1, tabCount - 1)
+        let progress = CGFloat(clamped - Double(lower))
+        let start = lensCenterForTab(at: lower)
+        return start + (lensCenterForTab(at: upper) - start) * progress
+    }
+
+    private func lensCenterForTab(at index: Int) -> CGFloat {
+        guard usesVariableTabWidths else {
+            return metrics.barPadding + tabWidth / 2 + CGFloat(index) * tabStride
+        }
+        let precedingWidths = (0..<index).reduce(CGFloat.zero) {
+            $0 + tabWidth(at: $1)
+        }
         return metrics.barPadding
-            + tabWidth / 2
-            + CGFloat(clamped) * tabStride
+            + precedingWidths
+            + CGFloat(index) * tabGap
+            + tabWidth(at: index) / 2
     }
 
     /// The centre of the lens while a drag carries it, never leaving the strip.
@@ -571,9 +731,17 @@ struct EazyMorphingTabBarLayout {
 
     /// Where a point in the strip falls, as a fractional tab position.
     func lensPosition(draggedTo x: CGFloat) -> Double {
-        guard tabStride > 0 else { return 0 }
-        let offset = (lensCenter(draggedTo: x) - lensCenter(at: 0)) / tabStride
-        return min(max(Double(offset), 0), Double(max(tabCount - 1, 0)))
+        guard tabCount > 1 else { return 0 }
+        let center = lensCenter(draggedTo: x)
+        for index in 0..<(tabCount - 1) {
+            let start = lensCenter(at: index)
+            let end = lensCenter(at: index + 1)
+            if center <= end {
+                guard end > start else { return Double(index) }
+                return Double(index) + Double((center - start) / (end - start))
+            }
+        }
+        return Double(tabCount - 1)
     }
 
     /// The lens itself, resting on `index`.
@@ -596,9 +764,18 @@ struct EazyMorphingTabBarLayout {
     func lens(_ flight: EazyMorphingTabBarLensFlight) -> EazyLiquidGlassShape {
         guard tabCount > 0 else { return .none }
         let center = lensCenter(at: flight.position)
-        let stretch = CGFloat(flight.elongation(scaledBy: metrics)) * tabStride
-        let leading = center + flight.direction * tabWidth / 2
-        let trailing = center - flight.direction * (tabWidth / 2 + stretch)
+        let width = tabWidth(at: flight.position)
+        let travelDistance = abs(
+            lensCenter(at: flight.destination) - lensCenter(at: flight.origin)
+        )
+        let stretch = CGFloat(
+            EazyMorphingTabBarStretch.hump(
+                flight.progress,
+                peak: metrics.lensStretchPeak
+            ) * metrics.lensStretch
+        ) * travelDistance
+        let leading = center + flight.direction * width / 2
+        let trailing = center - flight.direction * (width / 2 + stretch)
         return .capsule(
             CGRect(
                 x: min(leading, trailing),
@@ -718,6 +895,25 @@ struct EazyMorphingTabBarLensFlight: Equatable {
         return min(max((position - origin) / travel, 0), 1)
     }
 
+    /// Commits the lens to a selected tab without losing an existing landing.
+    ///
+    /// A drag schedules its landing before it updates the selection binding.
+    /// The binding observer then asks for the same transition. Returning the
+    /// existing flight in that case is essential: replacing it would discard
+    /// the finger's release position and briefly send the lens back through the
+    /// previously selected tab.
+    func committingSelection(to destination: Double, animated: Bool) -> Self {
+        guard animated else { return .init(resting: destination) }
+        guard !(isTravelling && self.destination == destination) else {
+            return self
+        }
+        return .init(
+            position: destination,
+            origin: position,
+            destination: destination
+        )
+    }
+
     /// How much longer than one tab the lens is right now, in tabs.
     ///
     /// A single hump that starts and ends at nothing, so the lens is exactly one
@@ -798,9 +994,11 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     @State private var flight = EazyMorphingTabBarLensFlight(resting: 0)
     /// Which tab is currently under an active press.
     @State private var pressedIndex: Int?
-    /// The width of the widest tab laid out at its ideal size, for the short
-    /// arrangement, where a tab is as wide as its title rather than a fixed box.
-    @State private var widestTab: CGFloat = 0
+    /// Ideal content widths for the two labelled arrangements. Keeping separate
+    /// caches prevents an orientation change from briefly applying landscape
+    /// measurements to the portrait bar, or vice versa.
+    @State private var measuredStackedTabWidths: [EazyTab.ID: CGFloat] = [:]
+    @State private var measuredTrailingTabWidths: [EazyTab.ID: CGFloat] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(iOS) || os(tvOS) || os(visionOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -926,16 +1124,10 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     /// imperatively left them free to disagree, and the lens crossed the bar in
     /// a couple of frames.
     private func travel(from previous: Int, to current: Int) {
-        guard !reduceMotion, previous != current else {
-            flight = .init(resting: Double(current))
-            return
-        }
-        flight = .init(
-            position: flight.position,
-            origin: flight.position,
-            destination: Double(current)
+        flight = flight.committingSelection(
+            to: Double(current),
+            animated: !reduceMotion && previous != current
         )
-        flight.position = Double(current)
     }
 
     /// How the lens crosses the bar, and nothing at all when a finger is
@@ -952,6 +1144,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         EazyMorphingTabBarLayout(
             metrics: scaledMetrics,
             tabCount: tabs.count,
+            tabWidths: resolvedTabWidths,
             expandedContentSize: expandedContentSize,
             hasToggle: showsToggle
         )
@@ -968,23 +1161,10 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
 
     /// The metrics with the title box grown to the reader's text size, and the
     /// bar grown by the same amount so the title keeps its footing — and, where
-    /// tabs are as wide as their titles, with the width the titles turned out to
-    /// need.
-    ///
-    /// The measured width only ever comes from the tabs' own ideal sizes, never
-    /// from the bar's, so reading it back here cannot feed on itself.
+    /// tabs are as wide as their titles, with each measured width passed to the
+    /// layout independently.
     private var scaledMetrics: EazyMorphingTabBarMetrics {
         var scaled = activeMetrics
-
-        if scaled.titlePlacement == .trailing, widestTab > 0 {
-            // Boxes here sit apart rather than overlapping, and that gap is the
-            // measurement worth keeping while the width itself is whatever the
-            // titles came to.
-            let gap = scaled.tabStride - scaled.tabWidth
-            scaled.tabWidth = widestTab
-            scaled.tabStride = widestTab + gap
-        }
-
         guard scaled.showsLabels, labelHeightScale > 1 else { return scaled }
         let growth = scaled.labelHeight * (labelHeightScale - 1)
         scaled.labelHeight += growth
@@ -994,6 +1174,37 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
             scaled.barHeight += growth
         }
         return scaled
+    }
+
+    /// Measured widths in tab order, available only after every tab in the
+    /// active arrangement has reported a valid size. Falling back as one set
+    /// avoids a partially-sized bar shifting several times on first layout.
+    private var resolvedTabWidths: [CGFloat]? {
+        let measured: [EazyTab.ID: CGFloat]
+        switch activeMetrics.titlePlacement {
+        case .below:
+            measured = measuredStackedTabWidths
+        case .trailing:
+            measured = measuredTrailingTabWidths
+        case .hidden:
+            return nil
+        }
+
+        let widths = tabs.compactMap { measured[$0.id] }
+        guard widths.count == tabs.count, widths.allSatisfy({ $0 > 0 }) else {
+            return nil
+        }
+
+        guard activeMetrics.titlePlacement == .below else { return widths }
+        let padded = widths.map {
+            max(scaledMetrics.tabWidth, $0 + scaledMetrics.longTitlePadding)
+        }
+        // Ordinary portrait titles keep the measured fixed geometry exactly.
+        // Variable widths activate only when at least one title outgrows it.
+        guard padded.contains(where: { $0 > scaledMetrics.tabWidth }) else {
+            return nil
+        }
+        return padded
     }
 
     private func canvas(_ layout: EazyMorphingTabBarLayout) -> some View {
@@ -1045,12 +1256,21 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
             }
         }
         .background(alignment: .bottomLeading) {
-            if layout.metrics.titlePlacement == .trailing {
+            switch layout.metrics.titlePlacement {
+            case .below:
                 EazyMorphingTabBarTabMeasure(
                     tabs: tabs,
                     metrics: layout.metrics,
-                    width: $widestTab
+                    widths: $measuredStackedTabWidths
                 )
+            case .trailing:
+                EazyMorphingTabBarTabMeasure(
+                    tabs: tabs,
+                    metrics: layout.metrics,
+                    widths: $measuredTrailingTabWidths
+                )
+            case .hidden:
+                EmptyView()
             }
         }
         // Bottom leading, and larger than the canvas by however far the surface
@@ -1220,8 +1440,6 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @MainActor Animatable {
                         .opacity(clearing)
                 }
             }
-        // only if there are no actions
-//            .scaleEffect(backgroundScale)
             .compositingGroup()
     }
 
@@ -1372,7 +1590,7 @@ private struct EazyMorphingTabBarStrip: View {
     private var metrics: EazyMorphingTabBarMetrics { layout.metrics }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: layout.stripSpacing) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 EazyMorphingTabBarTab(
                     tab: tab,
@@ -1382,14 +1600,14 @@ private struct EazyMorphingTabBarStrip: View {
                     isPressed: dragPressedIndex.map { $0 == index },
                     tint: tint,
                     metrics: metrics,
-                    width: layout.tabStride,
-                    boxWidth: layout.tabWidth,
+                    width: layout.tabHitWidth(at: index),
+                    boxWidth: layout.tabWidth(at: index),
                     onPressChanged: { isPressed in
                         withAnimation(selectionAnimation) {
                             pressedIndex = isPressed ? index : nil
                         }
                     }) {
-                    withAnimation(selectionAnimation) { select(tab) }
+                    select(tab)
                 }
             }
         }
@@ -1432,23 +1650,19 @@ private struct EazyMorphingTabBarStrip: View {
             .onEnded { value in
                 dragPressedIndex = nil
                 withAnimation(selectionAnimation) { pressedIndex = nil }
-                // Opening a journey is what lets the lens ease onto the tab —
-                // and stretch as it goes — instead of snapping there the moment
-                // the finger lifts.
-                let landing = Double(layout.tabIndex(at: value.location.x))
-                flight = .init(
-                    position: flight.position,
-                    origin: flight.position,
-                    destination: landing
+                let landingIndex = layout.tabIndex(at: value.location.x)
+                let landing = Double(landingIndex)
+                // Schedule the landing before changing the binding. The parent
+                // observes that binding too, and the idempotent transition keeps
+                // this release position as the journey's origin instead of
+                // replacing it with the previously selected tab.
+                flight = flight.committingSelection(
+                    to: landing,
+                    animated: selectionAnimation != nil
                 )
-                flight.position = landing
-                withAnimation(selectionAnimation) { select(at: value.location.x) }
+                guard let tab = tabs[safe: landingIndex] else { return }
+                select(tab)
             }
-    }
-
-    private func select(at x: CGFloat) {
-        guard let tab = tabs[safe: layout.tabIndex(at: x)] else { return }
-        select(tab)
     }
 
     private func select(_ tab: EazyTab) {
@@ -1576,8 +1790,8 @@ private struct EazyMorphingTabBarTabContent: View {
 
     /// The short arrangement: one line, both parts centered in the height, and
     /// the whole tab as wide as its own title. The system pads it by six before
-    /// the symbol and ten after the title; here the two are shared out evenly,
-    /// because these tabs are drawn at one width rather than each at its own.
+    /// the symbol and ten after the title; here the combined inset is shared
+    /// evenly while every tab keeps its own measured width.
     private var sideBySide: some View {
         HStack(spacing: metrics.titleSpacing) {
             symbol
@@ -1604,23 +1818,20 @@ private struct EazyMorphingTabBarTabContent: View {
     }
 }
 
-/// Lays every tab out at its ideal size, out of sight, and reports the widest.
+/// Lays every tab out at its ideal size, out of sight, and reports each width.
 ///
 /// Only the short arrangement needs this. There a tab is as wide as its own
-/// title — the system's run from 81 points for "Inbox" to 93 for "Settings" — and
-/// a title's width is not something a layout can be told in advance, only
-/// measured. They are then all drawn at the widest, which is the one deliberate
-/// departure from the system here: it keeps a single tab width, and with it the
-/// lens geometry, the hit areas and the drag, at the cost of a bar a few points
-/// wider than the system's when the titles differ in length. Titles of the same
-/// length give the same bar.
+/// title — the system's run from 81 points for "Inbox" to 93 for "Settings" —
+/// and a title's width is not something a layout can be told in advance, only
+/// measured. Keeping every result independently prevents one long title from
+/// widening every tab in the bar.
 ///
 /// Nothing measured here depends on the bar's own size, so reading it back into
 /// the layout cannot feed on itself.
 private struct EazyMorphingTabBarTabMeasure: View {
     let tabs: [EazyTab]
     let metrics: EazyMorphingTabBarMetrics
-    @Binding var width: CGFloat
+    @Binding var widths: [EazyTab.ID: CGFloat]
 
     var body: some View {
         ZStack {
@@ -1635,16 +1846,16 @@ private struct EazyMorphingTabBarTabMeasure: View {
                     boxWidth: nil
                 )
                 .fixedSize()
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { newValue in
+                    widths[tab.id] = newValue
+                }
             }
         }
         .hidden()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { newValue in
-            width = newValue
-        }
     }
 }
 
@@ -1926,7 +2137,7 @@ private struct EazyMorphingTabBarPreview: View {
 
     private let tabs: [EazyTab] = [
         EazyTab(systemImage: "house", title: "Home"),
-        EazyTab(systemImage: "tray", title: "Inbox"),
+        EazyTab(systemImage: "tray", title: "Departments"),
         EazyTab(systemImage: "bell", title: "Activity"),
         EazyTab(systemImage: "square.stack", title: "Library")
     ]
@@ -1984,7 +2195,7 @@ private struct EazyMorphingTabBarShortScreenPreview: View {
 
     private let tabs: [EazyTab] = [
         EazyTab(systemImage: "house", title: "Home"),
-        EazyTab(systemImage: "tray", title: "Inbox"),
+        EazyTab(systemImage: "tray", title: "Departments"),
         EazyTab(systemImage: "bell", title: "Activity"),
         EazyTab(systemImage: "square.stack", title: "Library")
     ]
@@ -2025,38 +2236,69 @@ private struct EazyMorphingTabBarShortScreenPreview: View {
 }
 
 private struct EazyMorphingTabBarComparisonPreview: View {
-    @State private var selection = "tray"
+    private static let nativeSearchID = "native-search"
+
+    @State private var nativeSelection = "tray"
+    @State private var customSelection = "tray"
     @State private var isExpanded = false
 
     private let tabs: [EazyTab] = [
         EazyTab(systemImage: "house", title: "Home"),
-        EazyTab(systemImage: "tray", title: "Inbox"),
-        EazyTab(systemImage: "bell", title: "Activity"),
+        EazyTab(systemImage: "tray", title: "Departments and Ministries"),
+        EazyTab(systemImage: "bell", title: "Calendar"),
         EazyTab(systemImage: "square.stack", title: "Library")
     ]
 
-    var body: some View {
-        TabView {
-            ForEach(tabs) { tab in
-                ZStack(alignment: .bottom) {
-                    LinearGradient(
-                        colors: [.indigo, .purple, .orange],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+    private var actions: [EazyTabBarAction] {
+        [
+            EazyTabBarAction(
+                systemImage: "square.and.pencil",
+                title: "Create"
+            ) {}
+        ]
+    }
 
-                    EazyMorphingTabBar(
-                        tabs: tabs,
-                        selection: $selection,
-                        isExpanded: $isExpanded,
-                        actions: []
-                    )
-                    .padding(.bottom, EazyMorphingTabBarMetrics.screenInset)
+    var body: some View {
+        TabView(selection: $nativeSelection) {
+            ForEach(tabs) { tab in
+                Tab(value: tab.id) {
+                    comparisonCanvas
+                } label: {
+                    Label(tab.title, systemImage: tab.systemImage)
                 }
-                .tabItem { Label(tab.title, systemImage: tab.systemImage) }
-                .tag(tab.id)
             }
+
+            // Search is the system's detached trailing tab and therefore the
+            // closest native reference for the custom bar's action toggle.
+            Tab(value: Self.nativeSearchID, role: .search) {
+                comparisonCanvas
+            }
+        }
+        .onChange(of: nativeSelection) { _, current in
+            guard tabs.contains(where: { $0.id == current }) else { return }
+            customSelection = current
+        }
+        .onChange(of: customSelection) { _, current in
+            nativeSelection = current
+        }
+    }
+
+    private var comparisonCanvas: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(
+                colors: [.indigo, .purple, .orange],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            EazyMorphingTabBar(
+                tabs: tabs,
+                selection: $customSelection,
+                isExpanded: $isExpanded,
+                actions: actions
+            )
+            .padding(.bottom, EazyMorphingTabBarMetrics.screenInset)
         }
     }
 }

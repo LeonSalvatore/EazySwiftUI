@@ -226,6 +226,62 @@ struct MorphingTabBarNativeParityTests {
     }
 
     @Test
+    func aLongPortraitTitleTakesWidthFromShorterTabs() {
+        // Ideal boxes for Home, Departments and Ministries, Calendar, Library.
+        // The native bar gives the long destination first claim on constrained
+        // width instead of truncating it inside an equal-width tab.
+        let idealWidths: [CGFloat] = [94, 179, 94, 94]
+        let native = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: idealWidths.count,
+            tabWidths: idealWidths,
+            expandedContentSize: .zero,
+            hasToggle: false
+        )
+        .fitted(to: 360)
+        let customWithAction = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: idealWidths.count,
+            tabWidths: idealWidths,
+            expandedContentSize: CGSize(width: 72, height: 78),
+            hasToggle: true
+        )
+        .fitted(to: 360)
+
+        #expect(abs(native.tabWidth(at: 1) - 157.75) < 0.0001)
+        #expect(abs(native.tabWidth(at: 0) - 72.75) < 0.0001)
+        #expect(abs(customWithAction.tabWidth(at: 1) - 139.75) < 0.0001)
+        #expect(abs(customWithAction.tabWidth(at: 0) - 54.75) < 0.0001)
+        #expect((0..<4).allSatisfy { customWithAction.tabHitWidth(at: $0) >= 44 })
+        #expect(customWithAction.canvasSize.width == 360)
+    }
+
+    @Test
+    func variablePortraitHitCellsMeetAtTheLensBoundaries() {
+        let bar = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: 4,
+            tabWidths: [94, 179, 94, 94],
+            expandedContentSize: .zero,
+            hasToggle: false
+        )
+        .fitted(to: 360)
+
+        let firstCellCenter = bar.stripPadding + bar.tabHitWidth(at: 0) / 2
+        let adjacentCellDistance = (
+            bar.tabHitWidth(at: 0) + bar.tabHitWidth(at: 1)
+        ) / 2
+
+        #expect(abs(firstCellCenter - bar.lensCenter(at: 0)) < 0.0001)
+        #expect(
+            abs(
+                bar.lensCenter(at: 1) - bar.lensCenter(at: 0)
+                    - adjacentCellDistance
+            ) < 0.0001
+        )
+    }
+
+    @Test
     func theToggleTakesItsRoomFromTheStripRatherThanTheScreen() {
         let width: CGFloat = 360
         let withToggle = EazyMorphingTabBarLayout(
@@ -259,6 +315,8 @@ struct MorphingTabBarNativeParityTests {
         // in a 12-point box.
         #expect(metrics.labelSize == 10)
         #expect(metrics.labelHeight == 12)
+        #expect(metrics.longTitlePadding == 40)
+        #expect(metrics.minimumHitWidth == 44)
         #expect(metrics.showsLabels)
     }
 
@@ -402,6 +460,94 @@ struct MorphingTabBarShortScreenTests {
         let gaps: CGFloat = 4 * 3
         #expect(bar.naturalWidth == padding + boxes + gaps + padding)
         #expect(abs(bar.naturalWidth - 357) <= 1)
+    }
+
+    @Test
+    func differentlySizedTitlesKeepTheirIndividualWidths() {
+        let widths: [CGFloat] = [74, 118, 93, 82]
+        let bar = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: widths.count,
+            tabWidths: widths,
+            expandedContentSize: .zero,
+            hasToggle: false
+        )
+        let widestTabAppliedToEveryBox: CGFloat = 492
+
+        #expect(bar.usesVariableTabWidths)
+        #expect(bar.naturalWidth == 387)
+        #expect(bar.naturalWidth < widestTabAppliedToEveryBox)
+        #expect(widths.indices.map { bar.tabWidth(at: $0) } == widths)
+        #expect(bar.lens(at: 0).frame.width == 74)
+        #expect(bar.lens(at: 1).frame.width == 118)
+    }
+
+    @Test
+    func variableTabCentresAndDragBoundariesMatchTheirBoxes() {
+        let widths: [CGFloat] = [74, 118, 93, 82]
+        let bar = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: widths.count,
+            tabWidths: widths,
+            expandedContentSize: .zero,
+            hasToggle: false
+        )
+
+        #expect(bar.lensCenter(at: 0) == 41)
+        #expect(bar.lensCenter(at: 1) == 141)
+        #expect(bar.lensCenter(at: 2) == 250.5)
+        #expect(bar.lensCenter(at: 3) == 342)
+
+        let boundary = (bar.lensCenter(at: 1) + bar.lensCenter(at: 2)) / 2
+        #expect(bar.tabIndex(at: boundary - 1) == 1)
+        #expect(bar.tabIndex(at: boundary + 1) == 2)
+        #expect(abs(bar.lensPosition(draggedTo: boundary) - 1.5) < 0.0001)
+    }
+
+    @Test
+    func aConstrainedVariableBarPrioritizesLongTitlesAndKeepsItsGaps() {
+        let widths: [CGFloat] = [74, 118, 93, 82]
+        let bar = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: widths.count,
+            tabWidths: widths,
+            expandedContentSize: .zero,
+            hasToggle: false
+        )
+        .fitted(to: 300)
+
+        #expect(bar.barSize.width == 300)
+        #expect(bar.tabWidth(at: 1) > bar.tabWidth(at: 0))
+        #expect((0..<widths.count).allSatisfy { bar.tabHitWidth(at: $0) >= 44 })
+        #expect(
+            abs(
+                bar.lensCenter(at: 1) - bar.lensCenter(at: 0)
+                    - (bar.tabWidth(at: 0) / 2 + bar.tabGap + bar.tabWidth(at: 1) / 2)
+            ) < 0.0001
+        )
+        #expect(bar.lens(at: 3).frame.maxX <= 300 - metrics.barPadding + 0.0001)
+    }
+
+    @Test
+    func aLongTitleAndActionToggleFitTheLandscapeWidth() {
+        // Represents Home, Departments and Ministries, Calendar, and Library.
+        // The second tab is intentionally much wider than the rest.
+        let widths: [CGFloat] = [74, 230, 93, 82]
+        let availableWidth: CGFloat = 500
+        let bar = EazyMorphingTabBarLayout(
+            metrics: metrics,
+            tabCount: widths.count,
+            tabWidths: widths,
+            expandedContentSize: CGSize(width: 72, height: 78),
+            hasToggle: true
+        )
+        .fitted(to: availableWidth)
+
+        #expect(bar.canvasSize.width == availableWidth)
+        #expect(bar.barSize.width == availableWidth - metrics.spacing - metrics.barHeight)
+        #expect(bar.toggleRect.maxX == availableWidth)
+        #expect(bar.lens(at: 3).frame.maxX <= bar.barSize.width - metrics.barPadding + 0.0001)
+        #expect(bar.tabWidth(at: 1) > bar.tabWidth(at: 0))
     }
 }
 
@@ -643,6 +789,31 @@ struct MorphingTabBarLensFlightTests {
 
         #expect(flight.elongation(scaledBy: metrics) == 0)
         #expect(abs(layout().lens(flight).frame.width - metrics.tabWidth) < 0.0001)
+    }
+
+    @Test
+    func aDragLandingDoesNotReturnToTheOriginalSelection() {
+        let releasePosition = 1.65
+        let dragged = EazyMorphingTabBarLensFlight(resting: releasePosition)
+
+        let landing = dragged.committingSelection(to: 2, animated: true)
+        // Updating the binding invokes the selection observer with the same
+        // destination. It must leave the drag's transition untouched.
+        let observed = landing.committingSelection(to: 2, animated: true)
+
+        #expect(observed == landing)
+        #expect(observed.origin == releasePosition)
+        #expect(observed.position == 2)
+        #expect(observed.destination == 2)
+        #expect(observed.origin != 0)
+    }
+
+    @Test
+    func reduceMotionMakesADragLandingImmediate() {
+        let dragged = EazyMorphingTabBarLensFlight(resting: 1.65)
+        let landing = dragged.committingSelection(to: 2, animated: false)
+
+        #expect(landing == .init(resting: 2))
     }
 }
 

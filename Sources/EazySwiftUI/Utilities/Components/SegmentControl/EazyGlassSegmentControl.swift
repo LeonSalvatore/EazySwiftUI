@@ -309,7 +309,7 @@ private struct EazyGlassSegmentCapsule: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, macOS 26.0, *) {
                 Capsule()
                     .fill(.clear)
                     .frame(width: size.width, height: size.height)
@@ -336,7 +336,9 @@ private struct EazyGlassSegmentScrollTarget: ScrollTargetBehavior {
     @available(iOS 18.4, macOS 15.4, *)
     func properties(context: PropertiesContext) -> Properties {
         var properties = Properties()
+#if os(iOS)
         properties.limitsScrolls = true
+#endif
         return properties
     }
 }
