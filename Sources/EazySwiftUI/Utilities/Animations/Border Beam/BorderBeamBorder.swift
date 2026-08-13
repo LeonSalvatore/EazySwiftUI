@@ -19,6 +19,7 @@ struct BorderBeamBorder: View {
     var body: some View {
         if isEnabled {
             ZStack {
+
                 RoundedRectangle(cornerRadius: max(cornerRadius, 0))
                     .strokeBorder(border.tertiary, lineWidth: 0.6)
                     .opacity(showsBaseBorder ? 1 : 0)
@@ -45,9 +46,22 @@ struct BorderBeamBorder: View {
                     }
                 }
             }
-            .padding(0.5)
+            .padding()
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
     }
 }
+#Preview("Border beam border") {
+    RoundedRectangle(cornerRadius: 20)
+        .fill(.clear)
+        .frame(width: 280, height: 120)
+        .borderBeamEffect(
+            border: .cyan,
+            showsBaseBorder: true,
+            beam: [.pink, .purple, .cyan],
+            beamBlur: 15, cornerRadius: 20,
+            isEnabled: true)
+
+}
+
