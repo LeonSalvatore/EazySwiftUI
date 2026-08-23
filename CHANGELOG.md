@@ -2,7 +2,7 @@
 
 All notable changes to EazySwiftUI are documented here.
 
-## Unreleased
+## 0.8.0
 
 ### Added
 
