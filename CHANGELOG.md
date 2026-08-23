@@ -2,6 +2,18 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased
+
+### Added
+
+- `EazySlideOutMenu`, a reusable edge-menu container with caller-owned content,
+  styling, localization, and settled state; fractional or fixed widths;
+  leading and trailing placement with LTR and RTL support; resize-stable drag
+  progress; a 44-point visible dismiss region; Reduce Motion-aware settling;
+  automatic concentric content corners; accessible scrim and escape dismissal;
+  iOS back-swipe and horizontal-scroll arbitration; a macOS drag fallback; an
+  interactive preview; and external-module plus geometry tests
+
 ## 0.7.0
 
 ### Added

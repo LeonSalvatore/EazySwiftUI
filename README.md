@@ -21,6 +21,8 @@ import EazySwiftUI
   active tab, with optional icons, badges, and full appearance configuration
 - An expandable Liquid Glass menu that morphs between a compact label and
   caller-provided content
+- A configurable, accessible slide-out menu with interactive edge gestures,
+  caller-owned styling, and leading, trailing, LTR, and RTL layouts
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
 - SwiftUI interaction effects powered by Metal shaders
 - An animated, Reduce Motion-aware gradient beam for rounded borders
@@ -299,6 +301,79 @@ struct MoreMenu: View {
 The default collapsed size is 55×55 points. Use `labelSize` and `cornerRadius`
 to fit a different control, and keep progress between `0` and `1` for manual or
 interactive updates.
+
+### Slide-out menu
+
+`EazySlideOutMenu` reveals caller-provided navigation or utility content beside
+the primary app surface. The caller owns the settled `isExpanded` state, while
+the component owns interactive drag progress, resize handling, Reduce Motion,
+scrim dismissal, and accessibility-tree switching.
+
+```swift
+struct AppShell: View {
+    @State private var isMenuOpen = false
+
+    var body: some View {
+        EazySlideOutMenu(
+            isExpanded: $isMenuOpen,
+            configuration: .init(
+                menuWidth: .fraction(0.68),
+                contentShape: .roundedRectangle(cornerRadius: 36),
+                menuBackground: .indigo.opacity(0.08)
+            ),
+            closeAccessibilityLabel: "Close navigation menu"
+        ) { _ in
+            VStack(alignment: .leading) {
+                Text("Destinations")
+                    .font(.headline)
+
+                Button("Home", systemImage: "house") {
+                    isMenuOpen = false
+                }
+
+                Button("Library", systemImage: "books.vertical") {
+                    isMenuOpen = false
+                }
+            }
+            .padding()
+        } content: { _ in
+            NavigationStack {
+                ContentView()
+                    .toolbar {
+                        Button(
+                            isMenuOpen ? "Close menu" : "Open menu",
+                            systemImage: isMenuOpen
+                                ? "xmark"
+                                : "line.3.horizontal"
+                        ) {
+                            isMenuOpen.toggle()
+                        }
+                        .labelStyle(.iconOnly)
+                    }
+            }
+        }
+    }
+}
+```
+
+Use `.fixed(_:)` when the menu needs an exact width, or change `edge` to
+`.trailing`; widths are clamped to the available container and both edges adapt
+to LTR and RTL layout directions. By default, at least 44 points of primary
+content remain visible as a scrim-backed dismiss target; adjust
+`minimumVisibleContentWidth` only when the menu supplies another visible close
+control. The closing drag begins on that exposed, scrim-backed content, so menu
+rows should close the binding after selection and a full-width menu should
+include its own visible close control. Keep `openingEdgeWidth` narrow because
+its transparent gesture strip overlays controls at the configured menu edge.
+Colors, content shape, scale, shadow, scrim, animation, and haptics are
+configurable through `EazySlideOutMenuConfiguration`; the default automatic
+shape follows concentric display corners on current Apple platforms.
+
+Always provide a visible, labelled control bound to the same state. The drag is
+an accelerator that is unavailable to some assistive technologies. The
+caller-supplied `closeAccessibilityLabel` keeps localized product language in
+the consuming app, while the scrim and accessibility escape action provide
+ways to close the revealed menu.
 
 ### Liquid glass
 
@@ -762,6 +837,10 @@ platform-specific:
   `EazyPlatformImage` maps to `UIImage` on iOS and `NSImage` on macOS.
 - Image color extraction, `ImageGradient`, and
   `eazyImageGradientBackground(_:)` support both iOS and macOS.
+- `EazySlideOutMenu` uses UIKit gesture arbitration on iOS so system back swipes
+  and horizontal scrollers retain priority when appropriate. On macOS it uses a
+  native SwiftUI drag gesture; binding, buttons, scrim dismissal, and
+  accessibility escape work on both platforms.
 - The `.metal` sources are sources of the package target, so Xcode compiles
   them along with everything else and links them into one `default.metallib`
   inside the package's own resource bundle, built for whatever destination is
