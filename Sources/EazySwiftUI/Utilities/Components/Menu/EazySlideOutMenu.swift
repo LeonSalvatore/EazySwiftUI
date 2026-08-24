@@ -107,24 +107,6 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
                             closeAccessibilityLabel: closeAccessibilityLabel,
                             onClose: close
                         )
-                        .overlay {
-                            EazySlideOutMenuPointerSurface(onClose: close)
-                                .modifier(
-                                    EazySlideOutMenuPan(
-                                        isEnabled: {
-                                            isGestureEnabled
-                                                && isEffectivelyExpanded
-                                        },
-                                        isExpanded: { isExpanded },
-                                        edge: configuration.edge,
-                                        layoutDirection: layoutDirection,
-                                        handle: handlePan
-                                    )
-                                )
-                                .id(gestureIdentity)
-                                .accessibilityHidden(true)
-                                .accessibilityRespondsToUserInteraction(false)
-                        }
                     }
                 }
                 .mask { contentShape.ignoresSafeArea() }
@@ -147,30 +129,17 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
             EazySlideOutMenuBackground(color: configuration.menuBackground)
                 .ignoresSafeArea()
         }
-        .overlay(alignment: menuAlignment) {
-            if isGestureEnabled
-                && !isExpanded
-                && resolvedMenuWidth > 0
-                && resolvedOpeningEdgeWidth > 0
-            {
-                Color.clear
-                    .frame(width: resolvedOpeningEdgeWidth)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(.rect)
-                    .modifier(
-                        EazySlideOutMenuPan(
-                            isEnabled: { true },
-                            isExpanded: { isExpanded },
-                            edge: configuration.edge,
-                            layoutDirection: layoutDirection,
-                            handle: handlePan
-                        )
-                    )
-                    .id(gestureIdentity)
-                    .accessibilityHidden(true)
-                    .accessibilityRespondsToUserInteraction(false)
-            }
-        }
+        .modifier(
+            EazySlideOutMenuPan(
+                isEnabled: {
+                    isGestureEnabled && resolvedMenuWidth > 0
+                },
+                isExpanded: { isExpanded },
+                edge: configuration.edge,
+                layoutDirection: layoutDirection,
+                handle: handlePan
+            )
+        )
         .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .accessibilityAction(.escape, close)
         .onChange(of: isExpanded) { _, isNowExpanded in
@@ -203,15 +172,6 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
             containerWidth: containerWidth,
             specification: configuration.menuWidth,
             minimumVisibleContentWidth: configuration.minimumVisibleContentWidth
-        )
-    }
-
-    private var resolvedOpeningEdgeWidth: CGFloat {
-        min(
-            EazySlideOutMenuGeometry.finiteNonnegative(
-                configuration.openingEdgeWidth
-            ),
-            containerWidth
         )
     }
 
@@ -285,16 +245,6 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
         isExpanded && resolvedMenuWidth > 0
     }
 
-    private var gestureIdentity: EazySlideOutMenuGestureIdentity {
-        EazySlideOutMenuGestureIdentity(
-            edge: configuration.edge,
-            layoutDirection: layoutDirection,
-            menuWidth: resolvedMenuWidth,
-            openingEdgeWidth: resolvedOpeningEdgeWidth,
-            hapticsEnabled: configuration.hapticsEnabled
-        )
-    }
-
     private var revealAnimation: Animation? {
         reduceMotion ? nil : configuration.settleAnimation
     }
@@ -343,4 +293,9 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
         guard isExpanded else { return }
         settle(expanded: false)
     }
+}
+
+
+#Preview("Slide-out menu") {
+    EazySlideOutMenuPreview()
 }

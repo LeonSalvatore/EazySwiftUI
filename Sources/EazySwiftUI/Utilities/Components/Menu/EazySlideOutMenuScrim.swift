@@ -39,18 +39,3 @@ struct EazySlideOutMenuScrim<Surface: Shape>: View {
         return opacity * Double(EazySlideOutMenuGeometry.unitValue(progress))
     }
 }
-
-/// Handles pointer dismissal without putting the UIKit pan host on the
-/// accessible scrim button.
-struct EazySlideOutMenuPointerSurface: View {
-    let onClose: () -> Void
-
-    var body: some View {
-        Button(action: onClose) {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-    }
-}

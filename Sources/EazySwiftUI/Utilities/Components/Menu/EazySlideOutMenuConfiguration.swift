@@ -8,9 +8,10 @@ public struct EazySlideOutMenuConfiguration {
     public var menuWidth: EazySlideOutMenuWidth
     /// The primary-content width that remains visible as a dismiss target.
     public var minimumVisibleContentWidth: CGFloat
-    /// The width of the overlay strip used to open a closed menu.
+    /// Reserved for source compatibility with earlier versions.
     ///
-    /// Keep this narrow so ordinary controls near the menu edge remain usable.
+    /// Closed-menu drag gestures now begin from the primary content surface instead
+    /// of an edge-only overlay, so this value no longer changes gesture behavior.
     public var openingEdgeWidth: CGFloat
     /// The menu's scale at zero reveal progress.
     public var menuMinimumScale: CGFloat

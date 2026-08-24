@@ -46,6 +46,7 @@ struct EazySlideOutMenuPan: ViewModifier {
 #if canImport(UIKit)
 
 private extension EazySlideOutMenuPan {
+
     struct Recognizer: UIGestureRecognizerRepresentable {
         let isEnabled: () -> Bool
         let isExpanded: () -> Bool
@@ -65,6 +66,7 @@ private extension EazySlideOutMenuPan {
             context: Context
         ) {
             context.coordinator.parent = self
+            recognizer.isEnabled = isEnabled()
         }
 
         func handleUIGestureRecognizerAction(
@@ -114,7 +116,8 @@ private extension EazySlideOutMenuPan {
                 else { return false }
 
                 let velocity = pan.velocity(in: gestureRecognizer.view)
-                return EazySlideOutMenuGeometry.shouldBeginPan(
+                return EazySlideOutMenuGeometry
+                    .shouldBeginPan(
                     horizontalVelocity: velocity.x,
                     verticalVelocity: velocity.y,
                     isExpanded: parent.isExpanded(),

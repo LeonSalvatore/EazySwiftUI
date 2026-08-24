@@ -4,7 +4,7 @@ import SwiftUI
     EazySlideOutMenuPreview()
 }
 
-private struct EazySlideOutMenuPreview: View {
+ struct EazySlideOutMenuPreview: View {
     @State private var isExpanded = false
 
     private let destinations = [
