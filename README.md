@@ -220,6 +220,119 @@ struct PanelRow: View {
 }
 ```
 
+### Tab view, bottom accessory, and the collapsing bar
+
+`EazyTabView` is a tab view built on `EazyMorphingTabBar`, with the bottom
+furniture laid out for you. It mirrors iOS 26's `TabView` +
+`tabViewBottomAccessory` + `tabBarMinimizeBehavior` from iOS 18 and macOS 15.
+
+```swift
+EazyTabView(selection: $selection) {
+    EazyTab("Home", systemImage: "house.fill", value: "home") {
+        HomeScreen()
+    }
+    EazyTab("Library", systemImage: "books.vertical.fill", value: "library") {
+        LibraryScreen()
+    }
+}
+.eazyTabBarMinimizeBehavior(.onScrollDown)
+.eazyTabViewBottomAccessory { NowPlayingBar() }
+```
+
+That is the whole wiring. Scrolling down collapses the bar into a 48-point
+circle and takes the accessory inline beside it; scrolling back to the top, or
+tapping the circle, restores both. Tapping the tab already showing takes its
+scroll view back to the top. The caller holds no state.
+
+Tabs are declared in the body the way `Tab` is, `if` and loops included, and
+`EazyTabContentBuilder` collects them. Where the tabs are already a value —
+loaded, filtered, ordered elsewhere — the array form takes them and a closure
+instead:
+
+```swift
+EazyTabView(tabs: tabs, selection: $selection) { tab in
+    content(for: tab)
+}
+```
+
+A tab holds its screen as a closure rather than as a view, so a tab list rebuilt
+on a parent update does not rebuild four screens to show one, and a list of tabs
+is still `Sendable` — writable as a plain `let` at file scope.
+
+Reselection reaches the tab's scroll view without the scroll view opting in:
+`scrollPosition(_:)` binds to a scroll view *within* the view it is attached to,
+the same reach that lets `eazyTabBarMinimizeBehavior` watch a scroll from above
+it. A screen that drives its own `scrollPosition` keeps it — the innermost one
+wins — and can act on the reselection itself:
+
+```swift
+@Environment(\.eazyTabReselection) private var reselection
+
+var body: some View {
+    NavigationStack(path: $path) { … }
+        .onChange(of: reselection) { path = NavigationPath() }
+}
+```
+
+The accessory's content can read where it is and adapt, exactly as the system's
+does — a full transport above the bar, a title and a play button beside a
+collapsed one:
+
+```swift
+struct NowPlayingBar: View {
+    @Environment(\.eazyTabViewBottomAccessoryPlacement) private var placement
+
+    var body: some View {
+        switch placement {
+        case .expanded: FullTransport()
+        case .inline, .none: CompactTransport()
+        }
+    }
+}
+```
+
+Apply `eazyTabViewBottomAccessory` to an `EazyTabView`, which is what draws it —
+as `tabViewBottomAccessory` needs a `TabView`. The accessory is declared outside
+and drawn inside, so it is laid out in the same coordinate space as the bar it
+sits eight points above, and can go and sit beside that bar when it collapses.
+
+`eazyTabBarMinimizeBehavior` goes outside everything. That is both possible and
+necessary: `onScrollGeometryChange` reports scroll views anywhere in the
+subtree, so a modifier above the tab view still sees the scroll view inside it,
+and only a common ancestor can put one state in front of both the content and
+the bar. It takes `.onScrollDown`, `.onScrollUp`, `.never` and `.automatic`.
+
+The geometry is measured off a live iOS 26 `TabView` in a 402x874 window, in
+both placements and frame by frame through the collapse — off the presentation
+layer, since the model layer jumps straight to the end:
+
+| | x | y | width | height |
+| --- | --- | --- | --- | --- |
+| accessory, expanded | 21 | 735 | 360 | 48 |
+| tab bar | 21 | 791 | 360 | 62 |
+| accessory, inline | 84 | 798 | 290 | 48 |
+| tab bar, collapsed | 28 | 798 | 48 | 48 |
+
+Everything else is derived from those. The collapsed circle is centred in the
+band the bar occupied — seven points inside it on every side — which is what
+puts it level with the inline accessory and 28 points off the screen's edge
+whatever the strip above it measured. The accessory falls onto that row by the
+distance between the two centre lines, so an accessory grown by an
+accessibility text size still lands centred. Collapsing is a spring with a small
+overshoot, spent on the trailing edge only: filmed collapsing, the system's
+shape runs past its resting place along the axis it travels and comes back,
+while its height decays onto 48 without dipping below.
+
+`EazyTabViewBottomAccessoryMetrics` and `EazyMorphingTabBarMetrics` carry the
+measurements and every one is adjustable. Reduce Motion drops the collapse and
+the move between placements; Reduce Transparency drops the glass for an opaque
+surface. The collapsed circle is a button labelled with the selected tab and
+hinted as showing the tab bar, and the strip behind it is hidden from VoiceOver
+while it is collapsed.
+
+Tabs are built the first time they are selected and then kept alive, the way a
+`TabView`'s are, so a tab returned to keeps its scroll position.
+
 ### Glass segment control
 
 `EazyGlassSegmentControl` is a horizontally scrollable strip of tabs. A glass

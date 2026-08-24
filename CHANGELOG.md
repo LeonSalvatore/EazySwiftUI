@@ -2,6 +2,52 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased
+
+### Added
+
+- `EazyTabView`, a tab view built on `EazyMorphingTabBar` that owns the content,
+  the bar and the bottom accessory, so all three are laid out against each other
+  in one coordinate space. Tabs are built on first selection and then kept
+  alive, so a tab returned to keeps its scroll position
+- `EazyTabContentBuilder` and `EazyTab`'s content initialisers, mirroring
+  `TabContentBuilder` and `Tab`: tabs are declared in `EazyTabView`'s body with
+  the screen behind each, with `if`, `if`–`else`, `if #available` and loops. A
+  tab holds its screen as a `@MainActor @Sendable` closure rather than as a
+  view, so a rebuilt tab list does not rebuild every screen and `[EazyTab]`
+  stays `Sendable` — still writable as a `let` at file scope. The array form,
+  `EazyTabView(tabs:selection:content:)`, is unchanged
+- Tapping the tab already showing takes its scroll view back to the top, as a
+  `TabView` does. No opt-in from the scroll view: `scrollPosition(_:)` binds to
+  a scroll view *within* the view it is attached to, the same reach
+  `onScrollGeometryChange` has. A screen driving its own `scrollPosition` keeps
+  it, and `eazyTabReselection` publishes the count so it can act on the
+  reselection itself. A drag that lands back on the tab it started on is not a
+  reselection
+- `eazyTabViewBottomAccessory(isEnabled:placement:metrics:style:animation:content:)`,
+  mirroring iOS 26's `tabViewBottomAccessory` from iOS 18 and macOS 15: an
+  expanded placement above the bar and an inline one sharing the collapsed bar's
+  row, a published `eazyTabViewBottomAccessoryPlacement` environment value so
+  content can adapt to the room it has, `EazyTabViewBottomAccessoryMetrics`
+  carrying geometry measured off a live iOS 26 `TabView` in both placements, a
+  `.shortScreen` preset for the 44-point landscape bar, and growth for
+  accessibility text sizes without letting greedy content size the accessory
+- `eazyTabBarMinimizeBehavior(_:)` and `EazyTabBarMinimizeBehavior`, mirroring
+  `tabBarMinimizeBehavior` with `.automatic`, `.onScrollDown`, `.onScrollUp` and
+  `.never`. Scrolling collapses `EazyMorphingTabBar` into a 48-point circle
+  holding the selected tab's symbol and takes the accessory inline beside it;
+  scrolling back to the top, or tapping the circle, restores both, with no state
+  held by the caller
+- `EazyMorphingTabBarMetrics.collapsedDiameter` and
+  `eazyMorphingTabBarCollapseProgress`, for content that has to keep step with
+  the collapse rather than with the boolean that started it
+
+### Changed
+
+- `EazyMorphingTabBar` now centres a bar narrower than its room with an offset
+  rather than with its alignment, so the circle it collapses into lands on the
+  screen's leading inset instead of inheriting the centred strip's
+
 ## 0.8.0
 
 ### Added

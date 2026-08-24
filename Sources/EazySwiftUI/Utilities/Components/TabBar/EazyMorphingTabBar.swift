@@ -50,6 +50,14 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
     public var barHeight: CGFloat
     /// The inset between the bar edge and the tab boxes inside it.
     public var barPadding: CGFloat
+    /// The diameter of the circle the bar collapses into while minimised.
+    ///
+    /// Forty-eight points, measured: the system's minimised bar is a 48-point
+    /// circle sitting where the 62-point bar was, centred in that band, which
+    /// puts it seven points inside the bar on every side and 28 points off the
+    /// screen's leading edge. The same 48 points the bottom accessory is tall,
+    /// which is what lets the two share a row.
+    public var collapsedDiameter: CGFloat
     /// The point size of a tab symbol.
     public var symbolSize: CGFloat
     /// Where the centre of a tab symbol sits, measured down from the top of the
@@ -189,6 +197,7 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         tabStride: CGFloat = 86,
         barHeight: CGFloat = 62,
         barPadding: CGFloat = 4,
+        collapsedDiameter: CGFloat = 48,
         symbolSize: CGFloat = 24,
         symbolCenterY: CGFloat = 20,
         titlePlacement: EazyMorphingTabBarTitlePlacement = .below,
@@ -220,6 +229,7 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         self.tabStride = tabStride
         self.barHeight = barHeight
         self.barPadding = barPadding
+        self.collapsedDiameter = min(max(collapsedDiameter, 1), barHeight)
         self.symbolSize = symbolSize
         self.symbolCenterY = symbolCenterY
         self.titlePlacement = titlePlacement
@@ -313,6 +323,10 @@ public struct EazyMorphingTabBarMetrics: Equatable, Sendable {
         tabWidth: 84,
         tabStride: 88,
         barHeight: 44,
+        // Derived, not measured: the standard bar keeps seven points of itself
+        // on every side of the circle, so the short one does too. The system's
+        // landscape bar was not filmed collapsing.
+        collapsedDiameter: 30,
         symbolSize: 18,
         titlePlacement: .trailing,
         labelSize: 12,
@@ -598,6 +612,23 @@ struct EazyMorphingTabBarLayout {
         )
     }
 
+    /// The circle the bar collapses into while minimised.
+    ///
+    /// Centred in the band the full bar occupied rather than pinned to its
+    /// corner: the system's 48-point circle sits seven points inside its
+    /// 62-point bar on every side, which puts it 28 points off the screen's
+    /// leading edge once the bar's own 21-point inset is counted, and level
+    /// with an inline bottom accessory.
+    var collapsedRect: CGRect {
+        let inset = (metrics.barHeight - metrics.collapsedDiameter) / 2
+        return CGRect(
+            x: inset,
+            y: canvasSize.height - metrics.barHeight + inset,
+            width: metrics.collapsedDiameter,
+            height: metrics.collapsedDiameter
+        )
+    }
+
     var toggleRect: CGRect {
         CGRect(
             x: max(barSize.width, panelSize.width) + metrics.spacing,
@@ -677,6 +708,67 @@ struct EazyMorphingTabBarLayout {
             ),
             cornerRadius: capsuleRadius
                 + (metrics.panelCornerRadius - capsuleRadius) * CGFloat(min(max(progress, 0), 1))
+        )
+    }
+
+    /// The bar's outline part way between whatever it is now and the circle it
+    /// collapses into.
+    ///
+    /// Collapsing and expanding into the panel are mutually exclusive — there is
+    /// nothing to minimise a bar into while its panel is open — so this takes
+    /// the shape the expansion produced and carries it the rest of the way,
+    /// rather than trying to interpolate three states at once.
+    ///
+    /// The stretch is the same law the lens and the panel use, spent on the
+    /// edges that move. Filmed collapsing, the system's selection runs *past*
+    /// its resting place — its leading edge reaches 24.5 points on the way to
+    /// 28 and comes back — so the shape has to be able to overshoot and settle
+    /// rather than slide between two rectangles.
+    func surface(expandedBy expand: Double, collapsedBy collapse: Double) -> EazyLiquidGlassShape {
+        let open = surface(expandedBy: expand)
+        guard collapse > 0 else { return open }
+
+        let circle = EazyLiquidGlassShape(
+            frame: collapsedRect,
+            cornerRadius: metrics.collapsedDiameter / 2
+        )
+        let journey = min(max(collapse, 0), 1)
+        let stretch = CGFloat(
+            EazyMorphingTabBarStretch.hump(journey, peak: metrics.morphStretchPeak)
+                * metrics.morphStretch
+        )
+        // The progress is not clamped where it interpolates, so a spring's
+        // overshoot survives; the stretch is, because it is one hump over a
+        // journey and has to be nothing at both ends.
+        let lerp = { (from: CGFloat, to: CGFloat) -> CGFloat in
+            from + (to - from) * CGFloat(collapse)
+        }
+        let height = max(lerp(open.frame.height, circle.frame.height), 0)
+        // The stretch is spent on the trailing edge, and only there. That is
+        // what the recordings show: filmed collapsing, the system's shape runs
+        // *past* where it is going along the axis it is travelling — its
+        // travelling edge reaches 24.5 points on the way to 28 and comes back —
+        // while its height decays onto 48 without ever dipping below it. So the
+        // width overshoots and nothing else does.
+        let width = max(
+            lerp(open.frame.width, circle.frame.width)
+                - abs(circle.frame.width - open.frame.width) * stretch,
+            0
+        )
+        return EazyLiquidGlassShape(
+            frame: CGRect(
+                x: lerp(open.frame.minX, circle.frame.minX),
+                // Straight to the circle's own top edge. Deriving it from the
+                // height instead put the circle on the bar's floor rather than
+                // centred in the band it left behind, seven points low — which
+                // is exactly the seven points that separate a 48-point circle
+                // centred in a 62-point bar from one resting on its bottom.
+                y: lerp(open.frame.minY, circle.frame.minY),
+                width: width,
+                height: height
+            ),
+            cornerRadius: open.cornerRadius
+                + (circle.cornerRadius - open.cornerRadius) * CGFloat(journey)
         )
     }
 
@@ -982,6 +1074,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     private let collapseLabel: LocalizedStringResource
     private let morphAnimation: Animation
     private let selectionAnimation: Animation
+    private let collapseAnimation: Animation
     private let showsToggle: Bool
     private let expandedContent: () -> Expanded
 
@@ -1000,6 +1093,11 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     @State private var measuredStackedTabWidths: [EazyTab.ID: CGFloat] = [:]
     @State private var measuredTrailingTabWidths: [EazyTab.ID: CGFloat] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether a scroll has asked the bar to collapse, and the way back out.
+    /// Published by ``SwiftUICore/View/eazyTabBarMinimizeBehavior(_:)``; the
+    /// default proxy tracks nothing, so a bar with no behavior attached never
+    /// collapses.
+    @Environment(\.eazyTabBarMinimize) private var minimize
     #if os(iOS) || os(tvOS) || os(visionOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
@@ -1028,6 +1126,11 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
     ///     Ignored when Reduce Motion is on.
     ///   - selectionAnimation: How the lens travels between tabs. Ignored when
     ///     Reduce Motion is on.
+    ///   - collapseAnimation: How the bar collapses into its circle and back.
+    ///     The default is measured off the system's own: filmed collapsing, its
+    ///     selection overshoots its resting place by about three percent of the
+    ///     distance it covered and settles back over roughly half a second.
+    ///     Ignored when Reduce Motion is on.
     ///   - showsToggle: Whether the round button that opens the panel sits beside
     ///     the strip. Without it the strip takes the whole width, which is what
     ///     lets the bar match the system's exactly.
@@ -1047,6 +1150,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         collapseLabel: LocalizedStringResource = "Close",
         morphAnimation: Animation = .bouncy(duration: 0.75, extraBounce: 0.02),
         selectionAnimation: Animation = .spring(duration: 0.4, bounce: 0.15),
+        collapseAnimation: Animation = .spring(duration: 0.5, bounce: 0.12),
         showsToggle: Bool = true,
         @ViewBuilder expandedContent: @escaping () -> Expanded
     ) {
@@ -1063,6 +1167,7 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         self.collapseLabel = collapseLabel
         self.morphAnimation = morphAnimation
         self.selectionAnimation = selectionAnimation
+        self.collapseAnimation = collapseAnimation
         self.showsToggle = showsToggle
         self.expandedContent = expandedContent
     }
@@ -1078,10 +1183,15 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
             } action: { newValue in
                 availableWidth = newValue
             }
-            // Centred, not pinned to the leading edge: a bar narrower than the
-            // room it is given sits in the middle, which is where the system
-            // puts one that does not spread.
-            .overlay(alignment: .bottom) {
+            // Leading-aligned, and centred by an offset rather than by the
+            // alignment. A bar narrower than the room it is given does sit in
+            // the middle — that is where the system puts one that does not
+            // spread — but the circle it collapses into does not: that sits a
+            // fixed 28 points from the screen's leading edge whatever the strip
+            // above it measured, level with an inline bottom accessory, which
+            // has no idea how many tabs there were. Carrying the centring in an
+            // offset lets it unwind as the bar collapses, so both are true.
+            .overlay(alignment: .bottomLeading) {
                 canvas(layout)
             }
             // The bar insets itself, so placing one needs nothing but the edge
@@ -1091,6 +1201,16 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
             .onChange(of: selectedIndex, initial: true) { previous, current in
                 travel(from: previous, to: current)
             }
+    }
+
+    /// Whether the bar is drawing its collapsed circle.
+    ///
+    /// A bar whose panel is open is not a candidate: there is nothing sensible
+    /// to collapse a panel of actions into, and the toggle that closes it would
+    /// go with the strip. So the panel wins, and the scroll is ignored until it
+    /// is closed.
+    private var isCollapsed: Bool {
+        minimize.isTracking && minimize.isMinimized && !isExpanded && !tabs.isEmpty
     }
 
     /// The arrangement for the screen the bar is on.
@@ -1207,6 +1327,15 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         return padded
     }
 
+    /// How far a bar narrower than its room is pushed off the leading edge to
+    /// centre it.
+    ///
+    /// Spent by the collapse: the circle belongs to the screen's edge, not to
+    /// the strip's.
+    private func centeringOffset(_ layout: EazyMorphingTabBarLayout) -> CGFloat {
+        max((availableWidth - layout.canvasSize.width) / 2, 0)
+    }
+
     private func canvas(_ layout: EazyMorphingTabBarLayout) -> some View {
         ZStack(alignment: .bottomLeading) {
             EazyMorphingTabBarStrip(
@@ -1220,16 +1349,30 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
             )
             .frame(width: layout.barSize.width, height: layout.barSize.height)
             // Fades on the surface's own clock rather than on the boolean, so
-            // the strip is gone by the time there is a panel where it was.
+            // the strip is gone by the time there is a panel where it was — and
+            // by the time there is a circle where it was.
             .modifier(EazyMorphingTabBarStripFade())
-            .allowsHitTesting(!isExpanded)
-            .accessibilityHidden(isExpanded)
+            .allowsHitTesting(!isExpanded && !isCollapsed)
+            .accessibilityHidden(isExpanded || isCollapsed)
 
             EazyMorphingTabBarPanel(layout: layout) {
                 expandedContent()
             }
             .allowsHitTesting(isExpanded)
             .accessibilityHidden(!isExpanded)
+
+            if minimize.isTracking, let selected = tabs[safe: selectedIndex] {
+                EazyMorphingTabBarCollapsedTab(
+                    tab: selected,
+                    tint: tint,
+                    metrics: layout.metrics,
+                    rect: layout.collapsedRect
+                ) {
+                    minimize.setMinimized(false)
+                }
+                .allowsHitTesting(isCollapsed)
+                .accessibilityHidden(!isCollapsed)
+            }
 
             if showsToggle {
                 EazyMorphingTabBarToggle(
@@ -1243,6 +1386,9 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
                     collapseLabel: collapseLabel
                 )
                 .offset(x: layout.toggleRect.minX)
+                .modifier(EazyMorphingTabBarCollapseFade())
+                .allowsHitTesting(!isCollapsed)
+                .accessibilityHidden(isCollapsed)
             }
         }
         .frame(
@@ -1285,7 +1431,12 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
                 .modifier(
                     EazyMorphingTabBarSurface(
                         layout: layout,
-                        toggle: showsToggle ? .capsule(layout.toggleRect) : .none,
+                        // A collapsed bar has no toggle beside it, so the glass
+                        // must stop merging with one: a shape left in the merge
+                        // keeps a bridge of glass reaching out to nothing.
+                        toggle: showsToggle && !isCollapsed
+                            ? .capsule(layout.toggleRect)
+                            : .none,
                         flight: flight,
                         pressedIndex: pressedIndex,
                         lens: { lens(layout, $0) },
@@ -1305,6 +1456,16 @@ public struct EazyMorphingTabBar<Expanded: View>: View {
         // glass they belong in.
         .modifier(EazyMorphingTabBarMorph(progress: isExpanded ? 1 : 0))
         .animation(reduceMotion ? nil : morphAnimation, value: isExpanded)
+        // Unwound by the collapse, so the circle lands on the screen's leading
+        // inset rather than on the centered strip's. Driven by the same value as
+        // the collapse clock below, so the two travel together.
+        .offset(x: isCollapsed ? 0 : centeringOffset(layout))
+        // A clock of its own, for the same reason the morph has one: the strip
+        // leaving, the glass shrinking and the circle arriving are three things
+        // that have to keep step, and three springs of the same nominal length
+        // do not.
+        .modifier(EazyMorphingTabBarCollapse(progress: isCollapsed ? 1 : 0))
+        .animation(reduceMotion ? nil : collapseAnimation, value: isCollapsed)
     }
 }
 
@@ -1328,7 +1489,8 @@ public extension EazyMorphingTabBar {
         expandLabel: LocalizedStringResource = "More",
         collapseLabel: LocalizedStringResource = "Close",
         morphAnimation: Animation = .bouncy(duration: 0.75, extraBounce: 0.02),
-        selectionAnimation: Animation = .spring(duration: 0.4, bounce: 0.15)
+        selectionAnimation: Animation = .spring(duration: 0.4, bounce: 0.15),
+        collapseAnimation: Animation = .spring(duration: 0.5, bounce: 0.12)
     ) where Expanded == EazyTabBarActionGrid {
         self.init(
             tabs: tabs,
@@ -1344,6 +1506,7 @@ public extension EazyMorphingTabBar {
             collapseLabel: collapseLabel,
             morphAnimation: morphAnimation,
             selectionAnimation: selectionAnimation,
+            collapseAnimation: collapseAnimation,
             showsToggle: !actions.isEmpty
         ) {
             EazyTabBarActionGrid(
@@ -1395,6 +1558,9 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @MainActor Animatable {
     /// How far the surface is through its morph. Arrives already interpolated,
     /// a frame at a time, from the modifier that owns that clock.
     @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
+    /// How far the bar is through collapsing into its circle. Arrives already
+    /// interpolated, a frame at a time, like the morph beside it.
+    @Environment(\.eazyMorphingTabBarCollapseProgress) private var collapse
     var animatableData: Double {
         get { flight.position }
         set { flight.position = newValue }
@@ -1416,15 +1582,20 @@ private struct EazyMorphingTabBarSurface: ViewModifier, @MainActor Animatable {
         // overshoot, and its bottom edges are aligned; everything given in the
         // canvas's own space therefore sits that much further down in this one.
         let lift = layout.stretchHeadroom.height
-        var shape = layout.surface(expandedBy: morph)
+        var shape = layout.surface(expandedBy: morph, collapsedBy: collapse)
         shape.frame.origin.y += lift
         var lens = self.lens(flight)
         lens.frame.origin.y += lift
         var toggle = self.toggle
         toggle.frame.origin.y += lift
         // The selection has no meaning once the strip has gone, so the glass
-        // closes over it as the panel opens rather than losing it in one frame.
-        let clearing = layout.metrics.lensClearing * (1 - min(max(morph, 0), 1))
+        // closes over it as the panel opens — or as the bar collapses — rather
+        // than losing it in one frame. Left open through a collapse the lens
+        // would end up clearing the whole circle, since the circle is the size
+        // the lens has shrunk to.
+        let clearing = layout.metrics.lensClearing
+            * (1 - min(max(morph, 0), 1))
+            * (1 - min(max(collapse, 0), 1))
 
         return content
             .eazyLiquidGlass(shape, merging: toggle, style: style)
@@ -1507,9 +1678,17 @@ private struct EazyMorphingTabBarMorph: ViewModifier, @preconcurrency Animatable
 /// a panel — and back before the panel has finished closing.
 private struct EazyMorphingTabBarStripFade: ViewModifier {
     @Environment(\.eazyMorphingTabBarMorphProgress) private var morph
+    @Environment(\.eazyMorphingTabBarCollapseProgress) private var collapse
 
     func body(content: Content) -> some View {
-        let showing = EazyMorphingTabBarStretch.stripVisibility(at: morph)
+        // Two clocks can take the strip away, and only the one that has gone
+        // furthest should be believed: multiplying them would let a bar that is
+        // half collapsed and half expanded show a strip at a quarter strength
+        // it never asked for.
+        let showing = min(
+            EazyMorphingTabBarStretch.stripVisibility(at: morph),
+            EazyMorphingTabBarStretch.stripVisibility(at: collapse)
+        )
         return content
             .opacity(showing)
             .blur(radius: 6 * (1 - showing))
@@ -1568,6 +1747,99 @@ private struct EazyMorphingTabBarPanel<Content: View>: View {
     }
 }
 
+/// Carries how far the bar is through its collapse down to everything drawn in
+/// it.
+///
+/// A second clock beside ``EazyMorphingTabBarMorph``, and for the same reason:
+/// the strip fading, the glass shrinking and the circle arriving all have to
+/// land together, and giving each its own spring of the same nominal length is
+/// what puts them out of step.
+private struct EazyMorphingTabBarCollapse: ViewModifier, @preconcurrency Animatable {
+    var progress: Double
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.environment(\.eazyMorphingTabBarCollapseProgress, progress)
+    }
+}
+
+/// Takes a control away as the bar collapses.
+///
+/// Used for the toggle, which has nowhere to be beside a 48-point circle. On
+/// the collapse's clock, so it is gone by the time the glass has shrunk past
+/// where it was standing.
+private struct EazyMorphingTabBarCollapseFade: ViewModifier {
+    @Environment(\.eazyMorphingTabBarCollapseProgress) private var collapse
+
+    func body(content: Content) -> some View {
+        let showing = 1 - EazyMorphingTabBarStretch.ramp(collapse, from: 0, to: 0.45)
+        return content
+            .opacity(showing)
+            .blur(radius: 4 * (1 - showing))
+            .scaleEffect(0.8 + 0.2 * showing)
+    }
+}
+
+/// What the bar shows once it has collapsed: the selected tab's symbol, and
+/// nothing else.
+///
+/// The symbol is centered here, where in the strip it sits well above centre to
+/// leave the lower half of the box to a label. There is no label to leave room
+/// for in a circle, and the system centres its own.
+///
+/// It is a button, because the collapsed bar is the only way back to the strip
+/// without scrolling: the system restores its bar when this is tapped, so this
+/// one does too.
+private struct EazyMorphingTabBarCollapsedTab: View {
+    let tab: EazyTab
+    let tint: Color
+    let metrics: EazyMorphingTabBarMetrics
+    let rect: CGRect
+    let onTap: () -> Void
+
+    @Environment(\.eazyMorphingTabBarCollapseProgress) private var collapse
+
+    var body: some View {
+        Button(action: onTap) {
+            Image(systemName: tab.systemImage)
+                .symbolVariant(.fill)
+                .font(.system(size: metrics.symbolSize, weight: .regular))
+                .foregroundStyle(tint)
+                .frame(width: rect.width, height: rect.height)
+                .contentShape(.circle)
+        }
+        .buttonStyle(EazyGlassPressStyle(scale: 0.92))
+        .accessibilityLabel(Text(tab.title))
+        .accessibilityHint(Text("Shows the tab bar"))
+        .accessibilityAddTraits([.isButton, .isSelected])
+        // Arrives only once the glass has most of the way shrunk, on the same
+        // clock, so the symbol is never sitting outside the circle that holds
+        // it — the mirror of the strip leaving.
+        .modifier(EazyMorphingTabBarCollapsedTabFade())
+        // The canvas is bottom-leading anchored and the circle is shorter than
+        // the bar, so it has to be lifted by the inset that centres it in the
+        // band the bar occupied.
+        .offset(x: rect.minX, y: -(metrics.barHeight - rect.height) / 2)
+    }
+}
+
+/// Brings the collapsed symbol in as the glass finishes shrinking.
+private struct EazyMorphingTabBarCollapsedTabFade: ViewModifier {
+    @Environment(\.eazyMorphingTabBarCollapseProgress) private var collapse
+
+    func body(content: Content) -> some View {
+        let showing = EazyMorphingTabBarStretch.ramp(collapse, from: 0.35, to: 1)
+        return content
+            .opacity(showing)
+            .blur(radius: 4 * (1 - showing))
+            .scaleEffect(0.7 + 0.3 * showing)
+    }
+}
+
 // MARK: - Tab strip
 
 /// The row of tabs, and the lens that travels between them.
@@ -1586,6 +1858,7 @@ private struct EazyMorphingTabBarStrip: View {
     let selectionAnimation: Animation?
 
     @State private var dragPressedIndex: Int?
+    @Environment(\.eazyTabReselectionHandler) private var reselection
 
     private var metrics: EazyMorphingTabBarMetrics { layout.metrics }
 
@@ -1661,12 +1934,22 @@ private struct EazyMorphingTabBarStrip: View {
                     animated: selectionAnimation != nil
                 )
                 guard let tab = tabs[safe: landingIndex] else { return }
-                select(tab)
+                select(tab, isTap: false)
             }
     }
 
-    private func select(_ tab: EazyTab) {
-        guard tab.id != selection else { return }
+    /// - Parameter isTap: Whether this came from a tap rather than from the end
+    ///   of a drag. A drag that lands back on the tab it started on has not
+    ///   asked for anything, so it reports nothing.
+    private func select(_ tab: EazyTab, isTap: Bool = true) {
+        guard tab.id != selection else {
+            // Tapping the tab already showing is not nothing — the system takes
+            // that screen back to the top. The bar has no way to do that
+            // itself, so it says the tap happened and leaves it to whoever owns
+            // the content. No haptic: nothing has been selected.
+            if isTap { reselection.handle(tab.id) }
+            return
+        }
         selection = tab.id
         EazyHaptics.selection()
     }
@@ -2089,6 +2372,10 @@ private struct EazyMorphingTabBarMorphProgressKey: EnvironmentKey {
     static let defaultValue: Double = 0
 }
 
+private struct EazyMorphingTabBarCollapseProgressKey: EnvironmentKey {
+    static let defaultValue: Double = 0
+}
+
 public extension EnvironmentValues {
     /// Whether the enclosing ``EazyMorphingTabBar`` is expanded.
     ///
@@ -2122,6 +2409,18 @@ public extension EnvironmentValues {
     var eazyMorphingTabBarMorphProgress: Double {
         get { self[EazyMorphingTabBarMorphProgressKey.self] }
         set { self[EazyMorphingTabBarMorphProgressKey.self] = newValue }
+    }
+
+    /// How far the enclosing ``EazyMorphingTabBar`` is through collapsing into
+    /// its circle, from nothing at the full strip to one at the circle.
+    ///
+    /// Updated every frame while the bar is collapsing, and briefly outside
+    /// zero and one where the spring overshoots. Read it for content that has
+    /// to keep step with the collapse rather than with the boolean that started
+    /// it.
+    var eazyMorphingTabBarCollapseProgress: Double {
+        get { self[EazyMorphingTabBarCollapseProgressKey.self] }
+        set { self[EazyMorphingTabBarCollapseProgressKey.self] = newValue }
     }
 }
 
@@ -2167,6 +2466,14 @@ private struct EazyMorphingTabBarPreview: View {
             )
             .ignoresSafeArea()
 
+            ScrollView {
+                ForEach(0..<100, id: \.self) { _ in
+                    Rectangle()
+                        .frame(height: 66)
+                       
+                }
+            }
+
             EazyMorphingTabBar(
                 tabs: tabs,
                 selection: $selection,
@@ -2177,6 +2484,7 @@ private struct EazyMorphingTabBarPreview: View {
             // ignoring the safe area rather than sitting above it.
             .padding(.bottom, EazyMorphingTabBarMetrics.screenInset)
             .ignoresSafeArea(edges: .bottom)
+         
 
         }
     }
@@ -2250,12 +2558,7 @@ private struct EazyMorphingTabBarComparisonPreview: View {
     ]
 
     private var actions: [EazyTabBarAction] {
-        [
-            EazyTabBarAction(
-                systemImage: "square.and.pencil",
-                title: "Create"
-            ) {}
-        ]
+        []
     }
 
     var body: some View {
