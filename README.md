@@ -23,6 +23,8 @@ import EazySwiftUI
   caller-provided content
 - A configurable, accessible slide-out menu with interactive edge gestures,
   caller-owned styling, and leading, trailing, LTR, and RTL layouts
+- An iOS variable backdrop blur that fades smoothly from a chosen screen edge,
+  with configurable contrast dimming and a material fallback
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
 - SwiftUI interaction effects powered by Metal shaders
 - An animated, Reduce Motion-aware gradient beam for rounded borders
@@ -487,6 +489,49 @@ an accelerator that is unavailable to some assistive technologies. The
 caller-supplied `closeAccessibilityLabel` keeps localized product language in
 the consuming app, while the scrim and accessibility escape action provide
 ways to close the revealed menu.
+
+### Variable blur
+
+`VariableBlur` creates an iOS backdrop that is strongest at `.top` or `.bottom`
+and fades smoothly into the content behind it. It is useful beneath status bars,
+toolbars, tab bars, and floating action areas where a uniform material would
+leave a visible ending line.
+
+```swift
+ScrollView {
+    ContentView()
+}
+.safeAreaInset(edge: .top, spacing: 0) {
+    HeaderView()
+        .background {
+            VariableBlur(edge: .top, maxRadius: 4, plateau: 0.1)
+                .ignoresSafeArea(edges: .top)
+        }
+}
+```
+
+The default `.bar` dimming uses the semantic system background. Supply a custom
+`VariableBlurDimming` to match the consuming app's own surface token, or pass
+`nil` for blur without a contrast gradient:
+
+```swift
+VariableBlur(
+    edge: .bottom,
+    maxRadius: 6,
+    dimming: VariableBlurDimming(
+        color: appSurfaceColor,
+        lightAlpha: 0.35,
+        darkAlpha: 0.2
+    ),
+    fallbackStyle: .systemUltraThinMaterial
+)
+```
+
+The component resolves the variable Core Animation filter at runtime and falls
+back to the requested `UIBlurEffect.Style` if that filter is unavailable. It is
+noninteractive, hidden from assistive technologies, and available only on UIKit
+platforms; the rest of the package continues to support its declared macOS 15
+minimum.
 
 ### Liquid glass
 

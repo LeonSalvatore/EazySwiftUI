@@ -2,6 +2,15 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased
+
+### Added
+
+- Public iOS `VariableBlur`, `VariableBlurEdge`, and `VariableBlurDimming` APIs,
+  extracted from Sanctum with caller-owned tinting, top and bottom ramps,
+  configurable plateau and fallback material, runtime-safe degradation, an
+  interactive preview, and external-module plus gradient-mask tests
+
 ## 0.9.0
 
 ### Added
