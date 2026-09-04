@@ -581,7 +581,7 @@ enum EazyLiquidGlassShaders {
                 .eazyLiquidGlass(
                     .capsule(CGRect(x: 0, y: 16, width: 232, height: 88)),
                     merging: .capsule(CGRect(x: 244, y: 16, width: 96, height: 88)),
-                    style: .regular
+                    style: .tabBar
                 )
         }
     }

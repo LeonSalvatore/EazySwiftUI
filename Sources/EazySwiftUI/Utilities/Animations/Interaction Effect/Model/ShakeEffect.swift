@@ -194,11 +194,13 @@ public struct ShakeEffectConfig: Sendable {
                     HStack {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.red)
-                            .interactionEffect(.spring(shakeTrigger))
 
-                        Text("Invalid input feedback")
+
+                        TextField("Invalid input feedback", text: .constant("text"))
                             .font(.caption)
+                            .textFieldStyle(.roundedBorder)
                     }
+                    .interactionEffect(.spring(shakeTrigger))
 
                     HStack {
                         Image(systemName: "person.fill")
