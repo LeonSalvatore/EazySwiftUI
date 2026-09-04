@@ -61,7 +61,7 @@ import EazySwiftUI
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.9.0`.
+3. Select **Up to Next Major Version** starting from `0.10.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -72,7 +72,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.9.0"
+        from: "0.10.0"
     )
 ]
 ```
