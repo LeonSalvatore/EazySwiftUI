@@ -33,6 +33,9 @@ let package = Package(
         // ``EazyShaderLibrary/library``, which resolves to `nil` there.
         .target(
             name: "EazySwiftUI",
+            resources: [
+                .process("PrivacyInfo.xcprivacy")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]

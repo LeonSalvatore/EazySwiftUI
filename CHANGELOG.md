@@ -2,6 +2,13 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased (planned for 0.10.1)
+
+### Added
+
+- A bundled privacy manifest declaring the package's app-only `UserDefaults`
+  access with Apple's approved `CA92.1` required reason
+
 ## 0.10.0
 
 ### Added

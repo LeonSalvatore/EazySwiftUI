@@ -52,6 +52,9 @@ import EazySwiftUI
 
 ## Installation
 
+The latest published release is `0.10.0`. The privacy-manifest update is
+planned for `0.10.1` and is not available through Swift Package Manager yet.
+
 ### Xcode
 
 1. In Xcode, select **File → Add Package Dependencies**.
