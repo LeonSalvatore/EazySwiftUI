@@ -2,10 +2,14 @@
 
 All notable changes to EazySwiftUI are documented here.
 
-## Unreleased (planned for 0.10.1)
+## 0.10.1
 
 ### Added
 
+- `EazySlideOutMenu`'s `showsBackground` parameter, defaulting to `true` to
+  preserve existing appearance. Set it to `false` to hide the component's menu
+  and primary-content backgrounds, shadow, and dismissing scrim
+- An expanded slide-out menu preview with `showsBackground: false`
 - A bundled privacy manifest declaring the package's app-only `UserDefaults`
   access with Apple's approved `CA92.1` required reason
 

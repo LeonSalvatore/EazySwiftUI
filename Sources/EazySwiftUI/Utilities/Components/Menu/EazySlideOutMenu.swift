@@ -33,6 +33,7 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
     @Binding private var isExpanded: Bool
 
     private let isGestureEnabled: Bool
+    private let showsBackground: Bool
     private let configuration: EazySlideOutMenuConfiguration
     private let closeAccessibilityLabel: LocalizedStringResource
     private let menuContent: (_ progress: CGFloat) -> MenuContent
@@ -50,6 +51,8 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
     /// - Parameters:
     ///   - isExpanded: The caller-owned settled presentation state.
     ///   - isGestureEnabled: Whether drag gestures may open and close the menu.
+    ///   - showsBackground: Whether to draw the menu and primary-content backgrounds
+    ///     and the primary-content shadow and dismissing scrim. Defaults to `true`.
     ///   - configuration: Layout, appearance, animation, and feedback settings.
     ///   - closeAccessibilityLabel: Caller-localized text for the dismissing scrim.
     ///   - menuContent: Menu content and its reveal progress from `0` through `1`.
@@ -57,6 +60,7 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
     public init(
         isExpanded: Binding<Bool>,
         isGestureEnabled: Bool = true,
+        showsBackground: Bool = true,
         configuration: EazySlideOutMenuConfiguration = .init(),
         closeAccessibilityLabel: LocalizedStringResource,
         @ViewBuilder menuContent: @escaping (_ progress: CGFloat) -> MenuContent,
@@ -64,6 +68,7 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
     ) {
         self._isExpanded = isExpanded
         self.isGestureEnabled = isGestureEnabled
+        self.showsBackground = showsBackground
         self.configuration = configuration
         self.closeAccessibilityLabel = closeAccessibilityLabel
         self.menuContent = menuContent
@@ -88,13 +93,15 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
                 )
                 .accessibilityHidden(isEffectivelyExpanded)
                 .background {
-                    EazySlideOutMenuBackground(
-                        color: configuration.contentBackground
-                    )
-                    .ignoresSafeArea()
+                    if showsBackground {
+                        EazySlideOutMenuBackground(
+                            color: configuration.contentBackground
+                        )
+                        .ignoresSafeArea()
+                    }
                 }
                 .overlay {
-                    if isEffectivelyExpanded || progress > 0 {
+                    if showsBackground, isEffectivelyExpanded || progress > 0 {
                         EazySlideOutMenuScrim(
                             shape: contentShape,
                             progress: progress,
@@ -112,7 +119,9 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
                 .mask { contentShape.ignoresSafeArea() }
                 .compositingGroup()
                 .shadow(
-                    color: configuration.shadowColor.opacity(Double(progress)),
+                    color: showsBackground
+                        ? configuration.shadowColor.opacity(Double(progress))
+                        : .clear,
                     radius: resolvedShadowRadius,
                     x: resolvedShadowOffset,
                     y: 0
@@ -126,8 +135,10 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
         )
         .contentShape(.rect)
         .background {
-            EazySlideOutMenuBackground(color: configuration.menuBackground)
-                .ignoresSafeArea()
+            if showsBackground {
+                EazySlideOutMenuBackground(color: configuration.menuBackground)
+                    .ignoresSafeArea()
+            }
         }
         .modifier(
             EazySlideOutMenuPan(
@@ -298,4 +309,8 @@ public struct EazySlideOutMenu<MenuContent: View, Content: View>: View {
 
 #Preview("Slide-out menu") {
     EazySlideOutMenuPreview()
+}
+
+#Preview("Slide-out menu without background") {
+    EazySlideOutMenuPreview(showsBackground: false, isExpanded: true)
 }

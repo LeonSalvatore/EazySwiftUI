@@ -4,8 +4,14 @@ import SwiftUI
     EazySlideOutMenuPreview()
 }
 
- struct EazySlideOutMenuPreview: View {
+struct EazySlideOutMenuPreview: View {
     @State private var isExpanded = false
+    let showsBackground: Bool
+
+    init(showsBackground: Bool = true, isExpanded: Bool = false) {
+        self.showsBackground = showsBackground
+        self._isExpanded = State(initialValue: isExpanded)
+    }
 
     private let destinations = [
         ("Home", "house"),
@@ -17,6 +23,7 @@ import SwiftUI
     var body: some View {
         EazySlideOutMenu(
             isExpanded: $isExpanded,
+            showsBackground: showsBackground,
             configuration: .init(
                 menuBackground: Color.secondary.opacity(0.08)
             ),

@@ -52,8 +52,8 @@ import EazySwiftUI
 
 ## Installation
 
-The latest published release is `0.10.0`. The privacy-manifest update is
-planned for `0.10.1` and is not available through Swift Package Manager yet.
+The latest published release is `0.10.1`, including the privacy manifest and
+optional slide-out menu backgrounds.
 
 ### Xcode
 
@@ -64,7 +64,7 @@ planned for `0.10.1` and is not available through Swift Package Manager yet.
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.10.0`.
+3. Select **Up to Next Major Version** starting from `0.10.1`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -75,7 +75,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.10.0"
+        from: "0.10.1"
     )
 ]
 ```
@@ -486,6 +486,13 @@ its transparent gesture strip overlays controls at the configured menu edge.
 Colors, content shape, scale, shadow, scrim, animation, and haptics are
 configurable through `EazySlideOutMenuConfiguration`; the default automatic
 shape follows concentric display corners on current Apple platforms.
+
+Pass `showsBackground: false` to `EazySlideOutMenu` to hide its menu and
+primary-content backgrounds, shadow, and dismissing scrim. It defaults to
+`true`, preserving the existing appearance. Caller-provided backgrounds remain
+visible. With the scrim hidden, provide a visible close control; drag gestures
+and the accessibility escape action still close the menu. The “Slide-out menu
+without background” preview demonstrates this option with the menu expanded.
 
 Always provide a visible, labelled control bound to the same state. The drag is
 an accelerator that is unavailable to some assistive technologies. The
