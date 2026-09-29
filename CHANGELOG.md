@@ -2,6 +2,26 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## 0.11.0
+
+### Added
+
+- `EazyNotchedRailCard`, a full-screen card whose edge holds an animated notch
+  around a scrolling icon wheel, extracted from WorshipPlus. The rail docks in
+  any corner through `EazyControlRailPlacement`. The card takes a caller-owned
+  fill and background, a `bottomBoundary` for overlapping tab bars, and
+  `EazyNotchedRailCardConfiguration` for layout
+- `EazyControlRail`, the standalone draggable and tappable wheel with a title
+  capsule that expands after each selection, plus `EazyControlRailConfiguration`
+  and the `EazyControlRailExpansion` state it publishes
+- `EazyNotchedCardShape`, the animatable card outline with a concave cutout
+- `eazyNotchedRailAdaptiveInset(_:)` and the `eazyNotchedRailContentRegion`
+  environment value, so rows clear the notch only while beside it
+- Notched rail card previews for all four placements, plus public-API and
+  geometry tests
+- `ShapeStyle.for(name:)`, a stable, case-insensitive color derived from a name,
+  for avatars, tags, and placeholders. Extracted from WorshipPlus
+
 ## 0.10.1
 
 ### Added

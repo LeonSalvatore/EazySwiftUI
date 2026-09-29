@@ -249,3 +249,32 @@ private struct EazyHexColorComponents {
         )
     }
 }
+
+// MARK: - Name-Derived Colors
+
+public extension ShapeStyle where Self == Color {
+
+    /// A stable color derived from `name`, for avatars, tags, and placeholders.
+    ///
+    /// The same name always produces the same hue, ignoring case, on every
+    /// launch and device. Saturation and brightness are fixed so every result
+    /// reads as a soft, vivid tone.
+    ///
+    /// ```swift
+    /// Circle().fill(.for(name: artist.name))
+    /// ```
+    static func `for`(name: String) -> Color {
+        Color(hue: eazyNameHue(name), saturation: 0.55, brightness: 0.90)
+    }
+}
+
+/// A hue in `0..<1` from a djb2 hash of the lowercased name.
+func eazyNameHue(_ name: String) -> Double {
+    var hash: UInt64 = 5381
+
+    for byte in name.lowercased().utf8 {
+        hash = (hash &* 33) &+ UInt64(byte)
+    }
+
+    return Double(hash % 360) / 360.0
+}

@@ -263,3 +263,29 @@ private func sRGBComponents(of color: Color) -> (red: Double, green: Double, blu
 }
 
 #endif
+
+@Suite("Name-derived colors")
+struct NameDerivedColorTests {
+    @Test
+    func hueIsStableAndCaseInsensitive() {
+        #expect(eazyNameHue("Worship") == eazyNameHue("worship"))
+        #expect(eazyNameHue("Worship") == eazyNameHue("WORSHIP"))
+        #expect(eazyNameHue("") == Double(5381 % 360) / 360)
+        #expect(eazyNameHue("a") == Double((5381 * 33 + 97) % 360) / 360)
+    }
+
+    @Test
+    func hueStaysInUnitRange() {
+        for name in ["", "a", "Hillsong", "Elevation Worship", String(repeating: "z", count: 500)] {
+            let hue = eazyNameHue(name)
+            #expect(hue >= 0 && hue < 1)
+        }
+    }
+
+    @Test
+    func colorIsAvailableAsAShapeStyle() {
+        let style: some ShapeStyle = .for(name: "Bethel")
+        _ = style
+        #expect(Color.for(name: "Bethel") == Color.for(name: "bethel"))
+    }
+}

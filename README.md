@@ -23,6 +23,8 @@ import EazySwiftUI
   caller-provided content
 - A configurable, accessible slide-out menu with interactive edge gestures,
   caller-owned styling, and leading, trailing, LTR, and RTL layouts
+- A notched rail card whose edge cutout animates around a scrolling icon wheel,
+  docked in any corner, with rows that clear the notch only beside it
 - An iOS variable backdrop blur that fades smoothly from a chosen screen edge,
   with configurable contrast dimming and a material fallback
 - Liquid glass surfaces and lenses drawn by Metal, from iOS 18 and macOS 15
@@ -52,8 +54,8 @@ import EazySwiftUI
 
 ## Installation
 
-The latest published release is `0.10.1`, including the privacy manifest and
-optional slide-out menu backgrounds.
+The latest published release is `0.11.0`, including the notched rail card and
+name-derived colors.
 
 ### Xcode
 
@@ -64,7 +66,7 @@ optional slide-out menu backgrounds.
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.10.1`.
+3. Select **Up to Next Major Version** starting from `0.11.0`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -75,7 +77,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.10.1"
+        from: "0.11.0"
     )
 ]
 ```
@@ -500,6 +502,63 @@ caller-supplied `closeAccessibilityLabel` keeps localized product language in
 the consuming app, while the scrim and accessibility escape action provide
 ways to close the revealed menu.
 
+### Notched rail card
+
+`EazyNotchedRailCard` is a full-screen card with a header, content, and a bottom
+bar. One edge holds a concave notch with an `EazyControlRail` inside it: a
+vertical icon wheel that you drag or tap, and that briefly expands a Liquid
+Glass capsule to show the selected item's title. The notch grows, shrinks, and
+moves with the rail in the same animation.
+
+```swift
+@AppStorage("railPlacement") private var placement: EazyControlRailPlacement = .topLeading
+@State private var selection: Section.ID?
+
+EazyNotchedRailCard(
+    items: sections,
+    selection: $selection,
+    fill: gradient.secondary,
+    selectionTint: .orange.opacity(0.55),
+    placement: placement
+) { section in
+    section.title
+} icon: { section in
+    Image(systemName: section.symbol)
+} header: {
+    Text("Library").font(.largeTitle.bold())
+} content: {
+    ScrollView {
+        LazyVStack(alignment: .leading) {
+            ForEach(rows) { row in
+                RowView(row)
+                    .eazyNotchedRailAdaptiveInset()
+            }
+        }
+    }
+} bottomBar: {
+    SearchBar(text: $query)
+}
+```
+
+`eazyNotchedRailAdaptiveInset(_:)` pads a row by the base margin, and adds the
+notch's depth on its side only while the row sits beside the cutout. Apply it to
+each row, not to the whole list, so rows above and below the rail reclaim the
+space. Content can also read the live cutout from the
+`eazyNotchedRailContentRegion` environment value.
+
+`placement` docks the rail in any of the four corners, and trailing placements
+mirror the cutout. Its raw values are stable, so it can be stored in
+`@AppStorage`. `bottomBoundary` keeps the card and bottom bar above an
+overlapping custom tab bar, given as a global y-coordinate. While
+`isBottomBarFocused` is `true`, the card extends behind the bottom bar, for
+example so a search field can expand. `EazyNotchedRailCardConfiguration` covers
+the rail width, notch depth, corner radius, and insets.
+
+The layers can also be used on their own. `EazyControlRail` is the standalone
+wheel, and it publishes its extents through an `EazyControlRailExpansion`
+binding. `EazyNotchedCardShape` is the animatable card outline that takes those
+extents.
+
 ### Variable blur
 
 `VariableBlur` creates an iOS backdrop that is strongest at `.top` or `.bottom`
@@ -726,6 +785,13 @@ Text(album.title)
 
 `luminance` and `isDark` expose the same information when a view needs to make
 its own decision.
+
+Give names a stable color, such as for avatars, tags, and placeholders. The same
+name always maps to the same hue, ignoring case:
+
+```swift
+Circle().fill(.for(name: artist.name))
+```
 
 ### Image color extraction
 
