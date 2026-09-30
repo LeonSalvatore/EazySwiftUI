@@ -86,6 +86,13 @@ struct EazyNotchedRailTests {
     }
 
     @Test
+    func emptyBottomBarReservesNoSpace() {
+        let padding = EdgeInsets(top: 12, leading: 12, bottom: 8, trailing: 12)
+        #expect(eazyNotchedRailBottomBarHeight(contentHeight: 0, padding: padding) == 0)
+        #expect(eazyNotchedRailBottomBarHeight(contentHeight: 50, padding: padding) == 70)
+    }
+
+    @Test
     func shapeWithoutNotchIsARoundedRectangle() {
         let rect = CGRect(x: 0, y: 0, width: 300, height: 600)
         let shape = EazyNotchedCardShape(

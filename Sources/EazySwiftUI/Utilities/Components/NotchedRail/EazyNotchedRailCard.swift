@@ -161,6 +161,8 @@ public struct EazyNotchedRailCard<
     }
 
     public var body: some View {
+        // Without a bottom bar the card runs down to the screen's bottom edge.
+        let hasBottomBar = collapsedBottomBarHeight > 0
         ZStack(alignment: .bottom) {
             // The card and rail retain their normal viewport while the keyboard
             // and an expanded bottom bar occupy an independent foreground layer.
@@ -174,6 +176,7 @@ public struct EazyNotchedRailCard<
                         placement: placement,
                         isBottomBarFocused: isBottomBarFocused,
                         collapsedBottomBarHeight: collapsedBottomBarHeight,
+                        extendsToBottomEdge: !hasBottomBar,
                         safeTop: screen.safeAreaInsets.top,
                         configuration: configuration,
                         isEnabled: isEnabled,
@@ -188,14 +191,15 @@ public struct EazyNotchedRailCard<
                     )
                     .padding(.horizontal, configuration.cardInset)
                     .padding(.top, configuration.cardInset)
+                    .padding(.bottom, hasBottomBar ? 0 : configuration.cardInset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     Color.clear
                         .frame(height: collapsedBottomBarHeight)
                 }
-                .padding(.bottom, bottomOverlap(in: screen))
+                .padding(.bottom, bottomOverlap(in: screen, extendsToBottomEdge: !hasBottomBar))
                 .background(background ?? AnyShapeStyle(.background))
-                .ignoresSafeArea(edges: .top)
+                .ignoresSafeArea(edges: hasBottomBar ? .top : [.top, .bottom])
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
 
@@ -209,12 +213,18 @@ public struct EazyNotchedRailCard<
         }
     }
 
-    private func bottomOverlap(in screen: GeometryProxy) -> CGFloat {
+    private func bottomOverlap(in screen: GeometryProxy, extendsToBottomEdge: Bool) -> CGFloat {
         eazyNotchedRailBottomOverlap(
-            contentBottom: screen.frame(in: .global).maxY,
+            contentBottom: screen.frame(in: .global).maxY + (extendsToBottomEdge ? screen.safeAreaInsets.bottom : 0),
             bottomBoundary: bottomBoundary
         )
     }
+}
+
+/// The space a bottom bar reserves below the card: its padded height, or
+/// nothing when it draws no content.
+func eazyNotchedRailBottomBarHeight(contentHeight: CGFloat, padding: EdgeInsets) -> CGFloat {
+    contentHeight > 0 ? contentHeight + padding.top + padding.bottom : 0
 }
 
 /// How far a view ending at `contentBottom` extends below `bottomBoundary`.
@@ -235,13 +245,17 @@ private struct EazyNotchedRailBottomBarLayer<BottomBar: View>: View {
         GeometryReader { screen in
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                bottomBar()
-                    .padding(padding)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                        if !isBottomBarFocused {
-                            collapsedHeight = height
-                        }
+                // The stack is measured even when the bar draws nothing, so a
+                // bar that goes away gives its space back to the card.
+                VStack(spacing: 0) {
+                    bottomBar()
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if !isBottomBarFocused {
+                        collapsedHeight = eazyNotchedRailBottomBarHeight(contentHeight: height, padding: padding)
                     }
+                }
+                .padding(padding)
             }
             .padding(.bottom, eazyNotchedRailBottomOverlap(
                 contentBottom: screen.frame(in: .global).maxY,
@@ -266,6 +280,7 @@ private struct EazyNotchedRailCardArea<
     let placement: EazyControlRailPlacement
     let isBottomBarFocused: Bool
     let collapsedBottomBarHeight: CGFloat
+    let extendsToBottomEdge: Bool
     let safeTop: CGFloat
     let configuration: EazyNotchedRailCardConfiguration
     let isEnabled: (Item) -> Bool
@@ -381,7 +396,10 @@ private struct EazyNotchedRailCardArea<
         if #available(iOS 26.0, macOS 26.0, *) {
             AnyShape(ConcentricRectangle(
                 uniformTopCorners: .concentric,
-                uniformBottomCorners: .fixed(bottomCornerRadius)
+                // At the screen's bottom edge the corners follow the display's.
+                uniformBottomCorners: extendsToBottomEdge && !isBottomBarFocused
+                    ? .concentric(minimum: .fixed(bottomCornerRadius))
+                    : .fixed(bottomCornerRadius)
             ))
         } else {
             AnyShape(ContainerRelativeShape().intersection(
