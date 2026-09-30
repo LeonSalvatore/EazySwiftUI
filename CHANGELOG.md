@@ -2,6 +2,15 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## 0.11.2
+
+### Fixed
+
+- `EazyNotchedRailCard` without a bottom bar now runs down to the screen's
+  bottom edge, with corners that follow the display's. It used to keep the
+  space measured for an earlier bottom bar, or a fixed 80 points, leaving an
+  empty strip below the card. A bar that draws nothing now reserves no space
+
 ## 0.11.1
 
 ### Fixed
