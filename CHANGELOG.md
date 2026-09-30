@@ -2,6 +2,16 @@
 
 All notable changes to EazySwiftUI are documented here.
 
+## Unreleased
+
+### Fixed
+
+- `EazySlideOutMenu` no longer rebuilds its menu and content when
+  `isGestureEnabled` changes. The pan gesture used to be removed and re-added,
+  which reset the state, focus, and scroll position of everything inside the
+  menu, for example when a caller enabled the gesture only while the menu was
+  open. The gesture now stays attached and disables itself
+
 ## 0.11.0
 
 ### Added

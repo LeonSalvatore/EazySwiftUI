@@ -21,25 +21,26 @@ struct EazySlideOutMenuPan: ViewModifier {
     @State private var fallbackPanDidBegin = false
 #endif
 
-    @ViewBuilder
+    // The gesture stays attached while disabled. Branching between `content`
+    // and `content.gesture(_:)` would give the menu and the content two
+    // identities, so every enable or disable would rebuild both and reset
+    // their state, focus, and scroll position.
     func body(content: Content) -> some View {
-        if isEnabled() {
 #if canImport(UIKit)
-            content.gesture(
-                Recognizer(
-                    isEnabled: isEnabled,
-                    isExpanded: isExpanded,
-                    edge: edge,
-                    layoutDirection: layoutDirection,
-                    handle: handle
-                )
+        // The recognizer disables itself through `isEnabled`.
+        content.gesture(
+            Recognizer(
+                isEnabled: isEnabled,
+                isExpanded: isExpanded,
+                edge: edge,
+                layoutDirection: layoutDirection,
+                handle: handle
             )
+        )
 #else
-            content.gesture(fallbackGesture)
+        // Subviews keep their gestures while the pan is disabled.
+        content.gesture(fallbackGesture, including: isEnabled() ? .all : .subviews)
 #endif
-        } else {
-            content
-        }
     }
 }
 
