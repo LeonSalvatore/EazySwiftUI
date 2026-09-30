@@ -54,8 +54,9 @@ import EazySwiftUI
 
 ## Installation
 
-The latest published release is `0.11.0`, including the notched rail card and
-name-derived colors.
+The latest published release is `0.11.1`, which keeps the slide-out menu's
+content intact when its gesture is toggled. `0.11.0` added the notched rail
+card and name-derived colors.
 
 ### Xcode
 
@@ -66,7 +67,7 @@ name-derived colors.
    https://github.com/LeonSalvatore/EazySwiftUI.git
    ```
 
-3. Select **Up to Next Major Version** starting from `0.11.0`.
+3. Select **Up to Next Major Version** starting from `0.11.1`.
 4. Add `EazySwiftUI` to your application target.
 
 ### Package.swift
@@ -77,7 +78,7 @@ Add EazySwiftUI to your package dependencies:
 dependencies: [
     .package(
         url: "https://github.com/LeonSalvatore/EazySwiftUI.git",
-        from: "0.11.0"
+        from: "0.11.1"
     )
 ]
 ```
